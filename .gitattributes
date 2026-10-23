@@ -1,0 +1,2 @@
+# Unified diff fixtures contain space-prefixed empty context lines.
+benchmarks/fixtures/*.patch whitespace=-blank-at-eol

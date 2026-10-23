@@ -65,6 +65,7 @@ struct TranslationStream {
     private(set) var text = ""
     private(set) var isDone = false
     private(set) var byteCount = 0
+    private var pendingText = ""
     private var finishReason: String?
     private let maximumOutputBytes: Int
     private let decoder = JSONDecoder()
@@ -91,9 +92,20 @@ struct TranslationStream {
                 throw TranslationError.outputTooLarge
             }
             text.append(content)
+            pendingText.append(content)
             byteCount += additionalBytes
         }
         if let reason = choice.finishReason { finishReason = reason }
+    }
+
+    var hasPendingText: Bool { !pendingText.isEmpty }
+
+    /// Drain unpublished bytes without slicing by grapheme boundaries: a later
+    /// fragment may extend an earlier character (combining marks or emoji ZWJ).
+    mutating func takePendingText() -> String {
+        let delta = pendingText
+        pendingText = ""
+        return delta
     }
 
     func completedText() throws -> String {

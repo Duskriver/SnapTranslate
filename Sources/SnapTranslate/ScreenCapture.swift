@@ -1,10 +1,8 @@
 import AppKit
 import CoreVideo
-import ImageIO
 // Xcode 16's SDK lacks Sendable annotations on its immutable content snapshot.
 // We consume that snapshot on the main actor, rather than sharing it ourselves.
 @preconcurrency import ScreenCaptureKit
-import UniformTypeIdentifiers
 
 struct CapturedImage: Sendable {
     let data: Data
@@ -55,29 +53,11 @@ enum ScreenCapture {
         configuration.pixelFormat = kCVPixelFormatType_32BGRA
         configuration.colorSpaceName = CGColorSpace.sRGB
         configuration.captureResolution = .best
-        let image = try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
-        try Task.checkCancellation()
-        // Encoding can be CPU intensive. Keep it off the UI actor, with cancellation propagated.
-        let encodingTask = Task.detached(priority: .userInitiated) {
+        // Admit before allocating a bitmap, so rapid replacements wait without
+        // retaining screenshots while the previous ImageIO call finishes.
+        return try await PNGEncoder.shared.captureAndEncode { @MainActor in
             try Task.checkCancellation()
-            return try autoreleasepool { try encode(image) }
+            return try await SCScreenshotManager.captureImage(contentFilter: filter, configuration: configuration)
         }
-        return try await withTaskCancellationHandler {
-            try await encodingTask.value
-        } onCancel: {
-            encodingTask.cancel()
-        }
-    }
-
-    private static func encode(_ image: CGImage) throws -> CapturedImage {
-        guard let data = CFDataCreateMutable(nil, 0),
-              let destination = CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil) else {
-            throw CaptureError.encodingFailed
-        }
-        CGImageDestinationAddImage(destination, image, nil)
-        guard CGImageDestinationFinalize(destination) else { throw CaptureError.encodingFailed }
-        try Task.checkCancellation()
-        guard CFDataGetLength(data) <= 10 * 1024 * 1024 else { throw CaptureError.imageTooLarge }
-        return CapturedImage(data: data as Data, mimeType: "image/png")
     }
 }

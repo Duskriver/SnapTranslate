@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let selector = RegionSelector()
     private let client = DeepSeekClient()
     private var statusItem: NSStatusItem?
+    private var captureMenuItems: [NSMenuItem] = []
     private var settingsController: SettingsWindowController?
     private var resultController: ResultPanelController?
     private var translationTask: Task<Void, Never>?
@@ -29,10 +30,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         installMainMenu()
         installStatusItem()
         hotKey.onPress = { [weak self] in self?.beginCapture() }
-        do { try hotKey.register() }
+        updateShortcutPresentation()
+        do { try hotKey.register(settings.captureShortcut) }
         catch { showAlert(title: "快捷键暂不可用", message: error.localizedDescription) }
         do {
-            if try settings.loadAPIKey().isEmpty { showSettings() }
+            if try !settings.hasAPIKey() { showSettings() }
         } catch {
             showSettings()
         }
@@ -48,6 +50,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         cancelTranslation()
         selector.cancel()
+        resultController?.dismiss()
+        settingsController?.close()
         hotKey.unregister()
     }
 
@@ -57,13 +61,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             ?? NSImage(systemSymbolName: "character.bubble", accessibilityDescription: "SnapTranslate")
         icon?.isTemplate = true
         item.button?.image = icon
-        item.button?.toolTip = "SnapTranslate · ⌥⇧T 截屏翻译"
         let menu = NSMenu()
         let title = NSMenuItem(title: "SnapTranslate · 轻译", action: nil, keyEquivalent: "")
         menu.addItem(title)
         menu.addItem(.separator())
-        let capture = NSMenuItem(title: "截屏翻译", action: #selector(beginCapture), keyEquivalent: "t")
-        capture.keyEquivalentModifierMask = [.option, .shift]
+        let capture = NSMenuItem(title: "截屏翻译", action: #selector(beginCapture), keyEquivalent: "")
+        captureMenuItems.append(capture)
         capture.target = self
         menu.addItem(capture)
         let preferences = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
@@ -81,9 +84,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         let appItem = NSMenuItem()
         let appMenu = NSMenu()
-        let capture = NSMenuItem(title: "截屏翻译", action: #selector(beginCapture), keyEquivalent: "t")
+        let capture = NSMenuItem(title: "截屏翻译", action: #selector(beginCapture), keyEquivalent: "")
+        captureMenuItems.append(capture)
         capture.target = self
-        capture.keyEquivalentModifierMask = [.option, .shift]
         appMenu.addItem(capture)
         let preferences = NSMenuItem(title: "设置…", action: #selector(showSettings), keyEquivalent: ",")
         preferences.target = self
@@ -107,8 +110,22 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showSettings() {
         selector.cancel()
-        if settingsController == nil { settingsController = SettingsWindowController(store: settings) }
+        if settingsController == nil {
+            let controller = SettingsWindowController(store: settings, hotKey: hotKey)
+            controller.onSave = { [weak self] in self?.updateShortcutPresentation() }
+            controller.onClose = { [weak self] in self?.settingsController = nil }
+            settingsController = controller
+        }
         settingsController?.present()
+    }
+
+    private func updateShortcutPresentation() {
+        let shortcut = settings.captureShortcut
+        for item in captureMenuItems {
+            item.keyEquivalent = shortcut.keyEquivalent
+            item.keyEquivalentModifierMask = shortcut.modifierFlags
+        }
+        statusItem?.button?.toolTip = "SnapTranslate · \(shortcut.displayName) 截屏翻译"
     }
 
     @objc private func beginCapture() {
@@ -146,21 +163,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             do {
                 let image = try await ScreenCapture.capture(region)
                 try Task.checkCancellation()
-                let text = try await self.client.translate(
+                _ = try await self.client.translate(
                     imageData: image.data, mimeType: image.mimeType, apiKey: apiKey, targetLanguage: language
-                ) { [weak self] text in
+                ) { [weak self] delta in
                     await MainActor.run {
                         guard let self, self.activeRequestID == identifier else { return }
-                        self.resultController?.update(text: text)
+                        self.resultController?.append(delta: delta)
                     }
                 }
                 try Task.checkCancellation()
                 guard self.activeRequestID == identifier else { return }
-                panel.update(text: text)
                 panel.finish()
             } catch {
                 guard !Task.isCancelled, self.activeRequestID == identifier else { return }
-                panel.showError(error.localizedDescription)
+                panel.showError(error)
             }
         }
     }
@@ -173,6 +189,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self?.resultController = nil
         }
         controller.onOpenSettings = { [weak self] in self?.showSettings() }
+        controller.onOpenScreenRecordingSettings = { [weak self] in self?.showScreenRecordingSettings() }
         resultController = controller
         return controller
     }
@@ -188,15 +205,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if CGRequestScreenCaptureAccess() { return true }
         let alert = NSAlert()
         alert.messageText = "需要屏幕录制权限"
-        alert.informativeText = "请在系统设置的「隐私与安全性 → 屏幕与系统音频录制」中允许 SnapTranslate，然后重新尝试 ⌥⇧T。应用仅在你框选区域后截取一张图片。若系统要求，请退出并重新打开应用。"
+        alert.informativeText = ScreenCapturePermission.recoveryMessage + "\n\n应用仅在你框选区域后截取一张图片。"
         alert.addButton(withTitle: "打开系统设置")
         alert.addButton(withTitle: "稍后")
         NSApp.activate(ignoringOtherApps: true)
-        if alert.runModal() == .alertFirstButtonReturn,
-           let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture") {
-            NSWorkspace.shared.open(url)
+        if alert.runModal() == .alertFirstButtonReturn {
+            showScreenRecordingSettings()
         }
         return false
+    }
+
+    private func showScreenRecordingSettings() {
+        // Let System Settings come forward without a floating result obscuring it.
+        resultController?.dismiss()
+        NSWorkspace.shared.open(ScreenCapturePermission.settingsURL)
     }
 
     private func showAlert(title: String, message: String) {

@@ -77,13 +77,13 @@ final class RegionSelector {
 }
 
 @MainActor
-private final class SelectionPanel: NSPanel {
+final class SelectionPanel: NSPanel {
     override var canBecomeKey: Bool { true }
     override var canBecomeMain: Bool { false }
 }
 
 @MainActor
-private final class SelectionView: NSView {
+final class SelectionView: NSView {
     var onSelection: ((NSRect) -> Void)?
     var onCancel: (() -> Void)?
     private var start: NSPoint?
@@ -94,6 +94,9 @@ private final class SelectionView: NSView {
     private let hintText = CATextLayer()
     private let hintSize: NSSize
     override var acceptsFirstResponder: Bool { true }
+
+    // A drag must start on any display, even when another overlay is key.
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 
     override init(frame frameRect: NSRect) {
         let title = NSAttributedString(

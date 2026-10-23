@@ -1,0 +1,175 @@
+--- a/Sources/TranslationCore/DeepSeekClient.swift
++++ b/Sources/TranslationCore/DeepSeekClient.swift
+@@ -2,27 +2,22 @@
+ 
+ public struct DeepSeekClient: Sendable {
+     private let makeSession: @Sendable () -> URLSession
+-    private let updateInterval: Duration
+ 
+     public init() {
+         makeSession = { URLSession(configuration: Self.sessionConfiguration()) }
+-        updateInterval = .milliseconds(90)
+     }
+ 
+     // A session factory lets tests exercise streaming and cancellation without a real API key.
+-    init(updateInterval: Duration = .milliseconds(90), makeSession: @escaping @Sendable () -> URLSession) {
+-        self.updateInterval = updateInterval
++    init(makeSession: @escaping @Sendable () -> URLSession) {
+         self.makeSession = makeSession
+     }
+ 
+-    /// Calls onDelta with new text only, coalesced about every 90 ms. Remaining
+-    /// text is flushed on completion or failure; cancellation never flushes it.
+     public func translate(
+         imageData: Data,
+         mimeType: String,
+         apiKey: String,
+         targetLanguage: String,
+-        onDelta: @escaping @Sendable (String) async -> Void
++        onUpdate: @escaping @Sendable (String) async -> Void
+     ) async throws -> String {
+         try Task.checkCancellation()
+         let request = try Self.makeRequest(
+@@ -51,29 +46,32 @@
+                 var stream = TranslationStream()
+                 let clock = ContinuousClock()
+                 var lastUpdate = clock.now
++                var lastPublishedByteCount = 0
+                 do {
+                     for try await byte in bytes {
+                         guard let payload = try parser.push(byte) else { continue }
+                         try Task.checkCancellation()
+                         try stream.consume(payload)
+-                        if stream.hasPendingText,
+-                           lastUpdate.duration(to: clock.now) >= updateInterval {
+-                            await onDelta(stream.takePendingText())
++                        if stream.byteCount != lastPublishedByteCount,
++                           lastUpdate.duration(to: clock.now) >= .milliseconds(90) {
++                            await onUpdate(stream.text)
++                            lastPublishedByteCount = stream.byteCount
+                             lastUpdate = clock.now
+                         }
+                         if stream.isDone { break }
+                     }
+                     try Task.checkCancellation()
+-                    if stream.hasPendingText {
+-                        await onDelta(stream.takePendingText())
++                    if stream.byteCount != lastPublishedByteCount {
++                        await onUpdate(stream.text)
++                        lastPublishedByteCount = stream.byteCount
+                     }
+-                    try Task.checkCancellation()
+                     return try stream.completedText()
+                 } catch {
+                     // Preserve the last partial text on an interrupted stream, but never
+                     // issue a late UI update after the caller has cancelled or closed it.
+-                    if !Task.isCancelled, stream.hasPendingText {
+-                        await onDelta(stream.takePendingText())
++                    if !Task.isCancelled, !stream.text.isEmpty,
++                       stream.byteCount != lastPublishedByteCount {
++                        await onUpdate(stream.text)
+                     }
+                     if !Task.isCancelled, !stream.text.isEmpty,
+                        let urlError = error as? URLError, urlError.code != .cancelled {
+--- a/Sources/TranslationCore/SSEParser.swift
++++ b/Sources/TranslationCore/SSEParser.swift
+@@ -65,7 +65,6 @@
+     private(set) var text = ""
+     private(set) var isDone = false
+     private(set) var byteCount = 0
+-    private var pendingText = ""
+     private var finishReason: String?
+     private let maximumOutputBytes: Int
+     private let decoder = JSONDecoder()
+@@ -92,22 +91,11 @@
+                 throw TranslationError.outputTooLarge
+             }
+             text.append(content)
+-            pendingText.append(content)
+             byteCount += additionalBytes
+         }
+         if let reason = choice.finishReason { finishReason = reason }
+     }
+ 
+-    var hasPendingText: Bool { !pendingText.isEmpty }
+-
+-    /// Drain unpublished bytes without slicing by grapheme boundaries: a later
+-    /// fragment may extend an earlier character (combining marks or emoji ZWJ).
+-    mutating func takePendingText() -> String {
+-        let delta = pendingText
+-        pendingText = ""
+-        return delta
+-    }
+-
+     func completedText() throws -> String {
+         guard isDone else { throw TranslationError.incompleteStream }
+         switch finishReason {
+--- a/Sources/SnapTranslate/ResultPanelController.swift
++++ b/Sources/SnapTranslate/ResultPanelController.swift
+@@ -67,18 +67,20 @@
+         panel.makeFirstResponder(textView)
+     }
+ 
+-    func append(delta: String) {
+-        guard presentationIsActive, !delta.isEmpty, let storage = textView.textStorage else { return }
++    func update(text: String) {
++        guard presentationIsActive else { return }
+         let shouldFollow = scrollView.contentView.bounds.maxY >= textView.bounds.height - 40
+-        if isDisplayingError, !hasTranslatedText {
+-            // Replace an error-only message, but preserve any partial translation.
+-            storage.setAttributedString(NSAttributedString(string: ""))
+-        }
+-        storage.append(NSAttributedString(string: delta, attributes: textAttributes))
+-        isDisplayingError = false
+-        hasTranslatedText = hasTranslatedText || delta.unicodeScalars.contains {
+-            !CharacterSet.whitespacesAndNewlines.contains($0)
++        let oldText = textView.string
++        if !isDisplayingError, text.hasPrefix(oldText), let storage = textView.textStorage {
++            let suffix = String(text.dropFirst(oldText.count))
++            if !suffix.isEmpty {
++                storage.append(NSAttributedString(string: suffix, attributes: textAttributes))
++            }
++        } else {
++            textView.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: textAttributes))
+         }
++        isDisplayingError = false
++        hasTranslatedText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+         statusLabel.stringValue = "正在翻译…"
+         statusLabel.textColor = .secondaryLabelColor
+         statusLabel.toolTip = nil
+@@ -87,7 +89,7 @@
+         copyButton.title = "复制译文"
+         copyButton.isEnabled = hasTranslatedText
+         if shouldFollow {
+-            textView.scrollRangeToVisible(NSRange(location: storage.length, length: 0))
++            textView.scrollRangeToVisible(NSRange(location: textView.string.utf16.count, length: 0))
+         }
+     }
+ 
+@@ -117,7 +119,7 @@
+     func finish() {
+         guard presentationIsActive, !isDisplayingError else { return }
+         stopProgress()
+-        if !hasTranslatedText {
++        if textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+             showError(TranslationError.emptyTranslation)
+             return
+         }
+@@ -134,7 +136,7 @@
+         endPresentation()
+     }
+ 
+-    private let textAttributes: [NSAttributedString.Key: Any] = {
++    private var textAttributes: [NSAttributedString.Key: Any] {
+         let paragraph = NSMutableParagraphStyle()
+         paragraph.lineSpacing = 4
+         return [
+@@ -142,7 +144,7 @@
+             .foregroundColor: NSColor.textColor,
+             .paragraphStyle: paragraph,
+         ]
+-    }()
++    }
+ 
+     private func configureContent(in panel: NSPanel) {
+         let content = NSView()

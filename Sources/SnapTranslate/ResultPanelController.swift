@@ -1,17 +1,20 @@
 import AppKit
+import TranslationCore
 
 /// A plain-text result window. No browser, history, or image is retained here.
 @MainActor
 final class ResultPanelController: NSWindowController, NSWindowDelegate {
     var onClose: (() -> Void)?
     var onOpenSettings: (() -> Void)?
+    var onOpenScreenRecordingSettings: (() -> Void)?
 
     private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 396, height: 220))
     private let scrollView = NSScrollView()
     private let statusLabel = NSTextField(labelWithString: "")
     private let progress = NSProgressIndicator()
     private let copyButton = NSButton(title: "复制译文", target: nil, action: nil)
-    private let settingsButton = NSButton(title: "设置…", target: nil, action: nil)
+    private let recoveryButton = NSButton(title: "设置…", target: nil, action: nil)
+    private var recoveryAction: ResultErrorPresentation.RecoveryAction?
     private var presentationIsActive = false
     private var isDisplayingError = false
     private var hasTranslatedText = false
@@ -29,6 +32,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
         panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        WindowResourcePolicy.configureUtilityWindow(panel)
         panel.animationBehavior = .none
         panel.contentMinSize = NSSize(width: 340, height: 250)
 
@@ -51,7 +55,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         textView.string = ""
         copyButton.isEnabled = false
         copyButton.title = "复制译文"
-        settingsButton.isHidden = true
+        setRecoveryAction(nil)
         statusLabel.stringValue = "正在读取截图并翻译…"
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.toolTip = nil
@@ -63,37 +67,38 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         panel.makeFirstResponder(textView)
     }
 
-    func update(text: String) {
-        guard presentationIsActive else { return }
+    func append(delta: String) {
+        guard presentationIsActive, !delta.isEmpty, let storage = textView.textStorage else { return }
         let shouldFollow = scrollView.contentView.bounds.maxY >= textView.bounds.height - 40
-        let oldText = textView.string
-        if !isDisplayingError, text.hasPrefix(oldText), let storage = textView.textStorage {
-            let suffix = String(text.dropFirst(oldText.count))
-            if !suffix.isEmpty {
-                storage.append(NSAttributedString(string: suffix, attributes: textAttributes))
-            }
-        } else {
-            textView.textStorage?.setAttributedString(NSAttributedString(string: text, attributes: textAttributes))
+        if isDisplayingError, !hasTranslatedText {
+            // Replace an error-only message, but preserve any partial translation.
+            storage.setAttributedString(NSAttributedString(string: ""))
         }
+        storage.append(NSAttributedString(string: delta, attributes: textAttributes))
         isDisplayingError = false
-        hasTranslatedText = !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        hasTranslatedText = hasTranslatedText || delta.unicodeScalars.contains {
+            !CharacterSet.whitespacesAndNewlines.contains($0)
+        }
         statusLabel.stringValue = "正在翻译…"
         statusLabel.textColor = .secondaryLabelColor
         statusLabel.toolTip = nil
         statusLabel.setAccessibilityHelp(nil)
-        settingsButton.isHidden = true
+        setRecoveryAction(nil)
         copyButton.title = "复制译文"
         copyButton.isEnabled = hasTranslatedText
         if shouldFollow {
-            textView.scrollRangeToVisible(NSRange(location: textView.string.utf16.count, length: 0))
+            textView.scrollRangeToVisible(NSRange(location: storage.length, length: 0))
         }
     }
 
-    func showError(_ message: String) {
+    func showError(_ error: any Error) {
         guard presentationIsActive else { return }
+        let presentation = ResultErrorPresentation(error: error)
+        let message = presentation.message
         stopProgress()
         isDisplayingError = true
-        let summary = hasTranslatedText ? "译文不完整 · \(message)" : "翻译未完成"
+        let failureTitle = presentation.recoveryAction == .openScreenRecordingSettings ? "需要屏幕录制权限" : "翻译未完成"
+        let summary = hasTranslatedText ? "译文不完整 · \(message)" : failureTitle
         statusLabel.stringValue = summary
         statusLabel.textColor = .systemRed
         statusLabel.toolTip = hasTranslatedText ? summary : message
@@ -106,17 +111,14 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         }
         copyButton.isEnabled = hasTranslatedText
         copyButton.title = hasTranslatedText ? "复制已有译文" : "复制译文"
-        // Only credentials and target language are configurable in this MVP.
-        // Network, service, and capture failures cannot be fixed in settings.
-        settingsButton.isHidden = !message.localizedCaseInsensitiveContains("API Key")
-            && !message.contains("目标语言")
+        setRecoveryAction(presentation.recoveryAction)
     }
 
     func finish() {
         guard presentationIsActive, !isDisplayingError else { return }
         stopProgress()
-        if textView.string.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            showError("没有收到译文，请重新截取包含文字的区域后重试。")
+        if !hasTranslatedText {
+            showError(TranslationError.emptyTranslation)
             return
         }
         statusLabel.stringValue = "翻译完成"
@@ -132,7 +134,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         endPresentation()
     }
 
-    private var textAttributes: [NSAttributedString.Key: Any] {
+    private let textAttributes: [NSAttributedString.Key: Any] = {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 4
         return [
@@ -140,7 +142,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
             .foregroundColor: NSColor.textColor,
             .paragraphStyle: paragraph,
         ]
-    }
+    }()
 
     private func configureContent(in panel: NSPanel) {
         let content = NSView()
@@ -192,16 +194,16 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         copyButton.action = #selector(copyTranslation)
         copyButton.isEnabled = false
         copyButton.toolTip = "将当前收到的译文复制到剪贴板"
-        settingsButton.bezelStyle = .rounded
-        settingsButton.target = self
-        settingsButton.action = #selector(openSettings)
-        settingsButton.isHidden = true
+        recoveryButton.bezelStyle = .rounded
+        recoveryButton.target = self
+        recoveryButton.action = #selector(performRecoveryAction)
+        recoveryButton.isHidden = true
 
         let hint = NSTextField(labelWithString: "Esc 关闭")
         hint.font = .systemFont(ofSize: 11)
         hint.textColor = .secondaryLabelColor
 
-        for view in [title, engine, statusLabel, progress, scrollView, copyButton, settingsButton, hint] {
+        for view in [title, engine, statusLabel, progress, scrollView, copyButton, recoveryButton, hint] {
             view.translatesAutoresizingMaskIntoConstraints = false
             content.addSubview(view)
         }
@@ -225,11 +227,11 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
             scrollView.bottomAnchor.constraint(equalTo: copyButton.topAnchor, constant: -14),
             copyButton.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
             copyButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
-            settingsButton.trailingAnchor.constraint(equalTo: copyButton.leadingAnchor, constant: -8),
-            settingsButton.centerYAnchor.constraint(equalTo: copyButton.centerYAnchor),
+            recoveryButton.trailingAnchor.constraint(equalTo: copyButton.leadingAnchor, constant: -8),
+            recoveryButton.centerYAnchor.constraint(equalTo: copyButton.centerYAnchor),
             hint.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
             hint.centerYAnchor.constraint(equalTo: copyButton.centerYAnchor),
-            hint.trailingAnchor.constraint(lessThanOrEqualTo: settingsButton.leadingAnchor, constant: -8),
+            hint.trailingAnchor.constraint(lessThanOrEqualTo: recoveryButton.leadingAnchor, constant: -8),
         ])
     }
 
@@ -283,7 +285,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         statusLabel.setAccessibilityHelp(nil)
         copyButton.isEnabled = false
         copyButton.title = "复制译文"
-        settingsButton.isHidden = true
+        setRecoveryAction(nil)
         isDisplayingError = false
         hasTranslatedText = false
         // All teardown precedes the callback. The owner may release its only
@@ -304,8 +306,19 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         }
     }
 
-    @objc private func openSettings() {
-        onOpenSettings?()
+    private func setRecoveryAction(_ action: ResultErrorPresentation.RecoveryAction?) {
+        recoveryAction = action
+        recoveryButton.title = action == .openScreenRecordingSettings ? "打开系统设置…" : "设置…"
+        recoveryButton.isHidden = action == nil
+    }
+
+    @objc private func performRecoveryAction() {
+        guard presentationIsActive else { return }
+        switch recoveryAction {
+        case .openSettings: onOpenSettings?()
+        case .openScreenRecordingSettings: onOpenScreenRecordingSettings?()
+        case nil: break
+        }
     }
 }
 

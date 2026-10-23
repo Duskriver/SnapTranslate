@@ -3,18 +3,60 @@ import Security
 
 @MainActor
 final class SettingsStore {
-    private let defaults = UserDefaults.standard
-    private let service = "com.local.SnapTranslate"
-    private let account = "deepseek-api-key"
+    private let defaults: UserDefaults
+    private let keyStorage: any APIKeyStorage
 
-    init() {}
+    init(defaults: UserDefaults = .standard, keyStorage: (any APIKeyStorage)? = nil) {
+        self.defaults = defaults
+        self.keyStorage = keyStorage ?? SystemAPIKeyStorage()
+    }
+
+    var captureShortcut: KeyboardShortcut {
+        get {
+            guard let data = defaults.data(forKey: "captureShortcut"),
+                  let shortcut = try? JSONDecoder().decode(KeyboardShortcut.self, from: data),
+                  shortcut.validationMessage == nil else { return .default }
+            return shortcut
+        }
+        set {
+            guard newValue.validationMessage == nil,
+                  let data = try? JSONEncoder().encode(newValue) else { return }
+            defaults.set(data, forKey: "captureShortcut")
+        }
+    }
 
     var targetLanguage: String {
         get { defaults.string(forKey: "targetLanguage") ?? "简体中文" }
         set { defaults.set(newValue, forKey: "targetLanguage") }
     }
 
-    func loadAPIKey() throws -> String {
+    func hasAPIKey() throws -> Bool { try keyStorage.containsKey() }
+    func loadAPIKey() throws -> String { try keyStorage.loadKey() }
+    func saveAPIKey(_ value: String) throws { try keyStorage.saveKey(value) }
+}
+
+@MainActor
+protocol APIKeyStorage {
+    func containsKey() throws -> Bool
+    func loadKey() throws -> String
+    func saveKey(_ value: String) throws
+}
+
+@MainActor
+private final class SystemAPIKeyStorage: APIKeyStorage {
+    /// Inspect item metadata only. Launching the app or opening settings must
+    /// not decrypt the saved credential or display an authorization dialog.
+    func containsKey() throws -> Bool {
+        var query = keyQuery
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+        query[kSecUseAuthenticationUI as String] = kSecUseAuthenticationUIFail
+        let status = SecItemCopyMatching(query as CFDictionary, nil)
+        if status == errSecItemNotFound { return false }
+        guard status == errSecSuccess else { throw KeychainError(status: status) }
+        return true
+    }
+
+    func loadKey() throws -> String {
         var query = keyQuery
         query[kSecReturnData as String] = true
         query[kSecMatchLimit as String] = kSecMatchLimitOne
@@ -28,7 +70,7 @@ final class SettingsStore {
         return value
     }
 
-    func saveAPIKey(_ value: String) throws {
+    func saveKey(_ value: String) throws {
         let value = value.trimmingCharacters(in: .whitespacesAndNewlines)
         if value.isEmpty {
             let status = SecItemDelete(keyQuery as CFDictionary)
@@ -56,8 +98,8 @@ final class SettingsStore {
     private var keyQuery: [String: Any] {
         [
             kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
+            kSecAttrService as String: "com.local.SnapTranslate",
+            kSecAttrAccount as String: "deepseek-api-key",
         ]
     }
 }

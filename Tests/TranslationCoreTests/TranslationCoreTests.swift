@@ -109,7 +109,7 @@ struct TranslationCoreTests {
         #expect(throws: TranslationError.outputTruncated) { try truncated.completedText() }
     }
 
-    @Test func clientPublishesFinalAccumulatedText() async throws {
+    @Test func clientCoalescesDeltasAndFlushesFinalText() async throws {
         StubURLProtocol.state.configure(chunks: [event(try chunk("你好")), event(try chunk("，世界")), event(finish("stop")), event(Data("[DONE]".utf8))])
         let updates = UpdateRecorder()
         let text = try await client().translate(
@@ -117,8 +117,78 @@ struct TranslationCoreTests {
         ) { await updates.append($0) }
         #expect(text == "你好，世界")
         let values = await updates.values
-        #expect(values.last == text)
+        #expect(values.joined() == text)
         #expect(values.count <= 2)
+    }
+
+    @Test func clientPublishesOnlyNewFragmentsIncludingSplitUnicode() async throws {
+        let fragments = ["e", "\u{301}", "👩", "\u{200D}", "💻", "\r", "\n", "中文"]
+        StubURLProtocol.state.configure(chunks: try fragments.map { event(try chunk($0)) }
+            + [event(finish("stop")), event(Data("[DONE]".utf8))])
+        let updates = UpdateRecorder()
+        let text = try await client(updateInterval: .zero).translate(
+            imageData: Data([1]), mimeType: "image/png", apiKey: "key", targetLanguage: "中文"
+        ) { await updates.append($0) }
+        #expect(await updates.values == fragments)
+        #expect(Array(text.utf8) == Array(fragments.joined().utf8))
+    }
+
+    @Test(arguments: ["incomplete", "malformed", "truncated"])
+    func pendingDeltasFlushOnceOnFailure(kind: String) async throws {
+        var events = [event(try chunk("第一段")), event(try chunk("第二段"))]
+        let expected: TranslationError
+        switch kind {
+        case "malformed":
+            events.append(event(Data("invalid JSON".utf8)))
+            expected = .malformedStream
+        case "truncated":
+            events += [event(finish("length")), event(Data("[DONE]".utf8))]
+            expected = .outputTruncated
+        default:
+            expected = .incompleteStream
+        }
+        StubURLProtocol.state.configure(chunks: events)
+        let updates = UpdateRecorder()
+        await #expect(throws: expected) {
+            try await client(updateInterval: .seconds(60)).translate(
+                imageData: Data([1]), mimeType: "image/png", apiKey: "key", targetLanguage: "中文"
+            ) { await updates.append($0) }
+        }
+        #expect(await updates.values == ["第一段第二段"])
+    }
+
+    @Test func cancellationAfterDeltaDoesNotPublishBufferedRemainder() async throws {
+        StubURLProtocol.state.configure(chunks: [
+            event(try chunk("first")), event(try chunk("must not appear")),
+            event(finish("stop")), event(Data("[DONE]".utf8)),
+        ])
+        let updates = UpdateRecorder()
+        let task = Task {
+            try await client(updateInterval: .zero).translate(
+                imageData: Data([1]), mimeType: "image/png", apiKey: "key", targetLanguage: "中文"
+            ) { delta in
+                await updates.append(delta)
+                withUnsafeCurrentTask { $0?.cancel() }
+            }
+        }
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(await updates.values == ["first"])
+    }
+
+    @Test func drainingPendingTextPreservesCompletionAndOutputLimit() throws {
+        var stream = TranslationStream(maximumOutputBytes: 6)
+        try stream.consume(chunk("你"))
+        #expect(stream.hasPendingText)
+        #expect(stream.takePendingText() == "你")
+        #expect(!stream.hasPendingText)
+        #expect(stream.takePendingText().isEmpty)
+        try stream.consume(chunk("好"))
+        #expect(throws: TranslationError.outputTooLarge) { try stream.consume(chunk("！")) }
+        #expect(stream.takePendingText() == "好")
+        try stream.consume(finish("stop"))
+        try stream.consume(Data("[DONE]".utf8))
+        #expect(try stream.completedText() == "你好")
+        #expect(!stream.hasPendingText)
     }
 
     @Test func clientFlushesPartialTextAndReportsTruncation() async throws {
@@ -164,8 +234,8 @@ struct TranslationCoreTests {
         #expect(StubURLProtocol.state.counts.stopped == 1)
     }
 
-    private func client() -> DeepSeekClient {
-        DeepSeekClient {
+    private func client(updateInterval: Duration = .milliseconds(90)) -> DeepSeekClient {
+        DeepSeekClient(updateInterval: updateInterval) {
             let configuration = DeepSeekClient.sessionConfiguration()
             configuration.protocolClasses = [StubURLProtocol.self]
             return URLSession(configuration: configuration)

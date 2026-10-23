@@ -9,5 +9,6 @@ let package = Package(
         .target(name: "TranslationCore"),
         .executableTarget(name: "SnapTranslate", dependencies: ["TranslationCore"]),
         .testTarget(name: "TranslationCoreTests", dependencies: ["TranslationCore"]),
+        .testTarget(name: "SnapTranslateTests", dependencies: ["SnapTranslate"]),
     ]
 )

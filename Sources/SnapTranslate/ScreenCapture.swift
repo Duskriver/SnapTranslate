@@ -1,7 +1,9 @@
 import AppKit
 import CoreVideo
 import ImageIO
-import ScreenCaptureKit
+// Xcode 16's SDK lacks Sendable annotations on its immutable content snapshot.
+// We consume that snapshot on the main actor, rather than sharing it ourselves.
+@preconcurrency import ScreenCaptureKit
 import UniformTypeIdentifiers
 
 struct CapturedImage: Sendable {

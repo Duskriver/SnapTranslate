@@ -1,4 +1,5 @@
 import AppKit
+import QuartzCore
 
 struct SelectedRegion {
     let rect: NSRect
@@ -65,8 +66,10 @@ final class RegionSelector {
         self.screenObserver = nil
         for panel in panels {
             (panel.contentView as? SelectionView)?.onSelection = nil
+            (panel.contentView as? SelectionView)?.onCancel = nil
             panel.orderOut(nil)
             panel.close()
+            panel.contentView = nil
         }
         panels.removeAll()
         completion(region)
@@ -85,7 +88,60 @@ private final class SelectionView: NSView {
     var onCancel: (() -> Void)?
     private var start: NSPoint?
     private var selection: NSRect = .zero
+    private let dimLayer = CAShapeLayer()
+    private let borderLayer = CAShapeLayer()
+    private let hintBackground = CALayer()
+    private let hintText = CATextLayer()
+    private let hintSize: NSSize
     override var acceptsFirstResponder: Bool { true }
+
+    override init(frame frameRect: NSRect) {
+        let title = NSAttributedString(
+            string: "拖动选择翻译区域 · Esc 取消",
+            attributes: [.font: NSFont.systemFont(ofSize: 14, weight: .medium), .foregroundColor: NSColor.white]
+        )
+        hintSize = title.size()
+        super.init(frame: frameRect)
+
+        // Host our own layers: AppKit must not repaint a screen-sized bitmap on
+        // every mouse movement. The compositor can reuse these vector layers.
+        let root = CALayer()
+        root.frame = bounds
+        root.isGeometryFlipped = false
+        layer = root
+        wantsLayer = true
+        dimLayer.fillColor = NSColor.black.withAlphaComponent(0.22).cgColor
+        dimLayer.fillRule = .evenOdd
+        borderLayer.fillColor = nil
+        borderLayer.strokeColor = NSColor.white.cgColor
+        borderLayer.lineWidth = 1
+        hintBackground.backgroundColor = NSColor.black.withAlphaComponent(0.76).cgColor
+        hintBackground.cornerRadius = 12
+        hintText.string = title
+        hintText.alignmentMode = .center
+        root.addSublayer(dimLayer)
+        root.addSublayer(borderLayer)
+        root.addSublayer(hintBackground)
+        hintBackground.addSublayer(hintText)
+        updateLayers()
+    }
+
+    required init?(coder: NSCoder) { nil }
+
+    override func layout() {
+        super.layout()
+        updateLayers()
+    }
+
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateLayers()
+    }
+
+    override func viewDidChangeBackingProperties() {
+        super.viewDidChangeBackingProperties()
+        updateLayers()
+    }
 
     override func resetCursorRects() { addCursorRect(bounds, cursor: .crosshair) }
     override func cancelOperation(_ sender: Any?) { onCancel?() }
@@ -95,15 +151,17 @@ private final class SelectionView: NSView {
         window?.makeKey()
         start = convert(event.locationInWindow, from: nil)
         selection = .zero
-        needsDisplay = true
+        updateLayers()
     }
 
     override func mouseDragged(with event: NSEvent) {
         guard let start else { return }
         let point = convert(event.locationInWindow, from: nil)
         let end = NSPoint(x: min(max(point.x, 0), bounds.width), y: min(max(point.y, 0), bounds.height))
-        selection = NSRect(x: min(start.x, end.x), y: min(start.y, end.y), width: abs(end.x - start.x), height: abs(end.y - start.y))
-        needsDisplay = true
+        let next = NSRect(x: min(start.x, end.x), y: min(start.y, end.y), width: abs(end.x - start.x), height: abs(end.y - start.y))
+        guard next != selection else { return }
+        selection = next
+        updateLayers()
     }
 
     override func mouseUp(with event: NSEvent) {
@@ -111,32 +169,30 @@ private final class SelectionView: NSView {
         guard selection.width >= 8, selection.height >= 8 else {
             start = nil
             selection = .zero
-            needsDisplay = true
+            updateLayers()
             return
         }
         onSelection?(selection)
     }
 
-    override func draw(_ dirtyRect: NSRect) {
-        let dim = NSBezierPath(rect: bounds)
-        if !selection.isEmpty { dim.appendRect(selection) }
-        dim.windingRule = .evenOdd
-        NSColor.black.withAlphaComponent(0.22).setFill()
-        dim.fill()
-        if !selection.isEmpty {
-            NSColor.white.setStroke()
-            let border = NSBezierPath(rect: selection.insetBy(dx: 0.5, dy: 0.5))
-            border.lineWidth = 1
-            border.stroke()
+    private func updateLayers() {
+        guard let root = layer else { return }
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        defer { CATransaction.commit() }
+
+        let scale = window?.backingScaleFactor ?? 1
+        for current in [root, dimLayer, borderLayer, hintBackground, hintText] {
+            current.contentsScale = scale
         }
-        let title = "拖动选择翻译区域 · Esc 取消" as NSString
-        let attributes: [NSAttributedString.Key: Any] = [
-            .font: NSFont.systemFont(ofSize: 14, weight: .medium), .foregroundColor: NSColor.white,
-        ]
-        let size = title.size(withAttributes: attributes)
-        let box = NSRect(x: (bounds.width - size.width) / 2 - 16, y: bounds.height - 92, width: size.width + 32, height: 38)
-        NSColor.black.withAlphaComponent(0.76).setFill()
-        NSBezierPath(roundedRect: box, xRadius: 12, yRadius: 12).fill()
-        title.draw(at: NSPoint(x: box.minX + 16, y: box.midY - size.height / 2), withAttributes: attributes)
+        dimLayer.frame = bounds
+        borderLayer.frame = bounds
+        let dim = CGMutablePath()
+        dim.addRect(bounds)
+        if !selection.isEmpty { dim.addRect(selection) }
+        dimLayer.path = dim
+        borderLayer.path = selection.isEmpty ? nil : CGPath(rect: selection.insetBy(dx: 0.5, dy: 0.5), transform: nil)
+        hintBackground.frame = NSRect(x: (bounds.width - hintSize.width) / 2 - 16, y: bounds.height - 92, width: hintSize.width + 32, height: 38)
+        hintText.frame = NSRect(x: 16, y: (38 - hintSize.height) / 2, width: hintSize.width, height: hintSize.height)
     }
 }

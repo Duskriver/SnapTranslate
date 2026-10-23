@@ -9,11 +9,16 @@ struct SelectedRegion {
 /// Transparent overlays contain no screenshot textures and exist only during selection.
 @MainActor
 final class RegionSelector {
+    private let notificationCenter: NotificationCenter
     private var panels: [SelectionPanel] = []
     private var completion: ((SelectedRegion?) -> Void)?
     private var eventMonitor: Any?
     private var screenObserver: NSObjectProtocol?
     var isSelecting: Bool { completion != nil }
+
+    init(notificationCenter: NotificationCenter = .default) {
+        self.notificationCenter = notificationCenter
+    }
 
     func begin(completion: @escaping (SelectedRegion?) -> Void) {
         cancel()
@@ -48,7 +53,7 @@ final class RegionSelector {
             if event.keyCode == 53 { self?.cancel(); return nil }
             return event
         }
-        screenObserver = NotificationCenter.default.addObserver(
+        screenObserver = notificationCenter.addObserver(
             forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.cancel() }
@@ -62,7 +67,7 @@ final class RegionSelector {
         self.completion = nil
         if let eventMonitor { NSEvent.removeMonitor(eventMonitor) }
         self.eventMonitor = nil
-        if let screenObserver { NotificationCenter.default.removeObserver(screenObserver) }
+        if let screenObserver { notificationCenter.removeObserver(screenObserver) }
         self.screenObserver = nil
         for panel in panels {
             (panel.contentView as? SelectionView)?.onSelection = nil

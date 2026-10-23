@@ -1,5 +1,4 @@
 import AppKit
-import TranslationCore
 
 @main
 struct SnapTranslateMain {
@@ -15,16 +14,38 @@ struct SnapTranslateMain {
 
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
-    private let settings = SettingsStore()
-    private let hotKey = GlobalHotKey()
-    private let selector = RegionSelector()
-    private let client = DeepSeekClient()
+    private let settings: SettingsStore
+    private let hotKey: GlobalHotKey
+    private let selector: RegionSelector
+    private let pipeline: TranslationPipeline
+    private let capturePermission: () -> Bool
+    private let makeResultPanel: () -> ResultPanelController
     private var statusItem: NSStatusItem?
     private var captureMenuItems: [NSMenuItem] = []
-    private var settingsController: SettingsWindowController?
-    private var resultController: ResultPanelController?
-    private var translationTask: Task<Void, Never>?
+    private(set) var settingsController: SettingsWindowController?
+    private(set) var resultController: ResultPanelController?
+    private(set) var translationTask: Task<Void, Never>?
     private var activeRequestID: UUID?
+    private var isTerminating = false
+
+    init(
+        settings: SettingsStore = SettingsStore(),
+        hotKey: GlobalHotKey = GlobalHotKey(),
+        selector: RegionSelector = RegionSelector(),
+        pipeline: TranslationPipeline = .live,
+        capturePermission: @escaping () -> Bool = {
+            CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess()
+        },
+        makeResultPanel: @escaping () -> ResultPanelController = { ResultPanelController() }
+    ) {
+        self.settings = settings
+        self.hotKey = hotKey
+        self.selector = selector
+        self.pipeline = pipeline
+        self.capturePermission = capturePermission
+        self.makeResultPanel = makeResultPanel
+        super.init()
+    }
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         installMainMenu()
@@ -48,6 +69,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationWillTerminate(_ notification: Notification) {
+        guard !isTerminating else { return }
+        isTerminating = true
+        hotKey.onPress = nil
         cancelTranslation()
         selector.cancel()
         resultController?.dismiss()
@@ -108,7 +132,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.mainMenu = menu
     }
 
-    @objc private func showSettings() {
+    @objc func showSettings() {
+        guard !isTerminating else { return }
         selector.cancel()
         if settingsController == nil {
             let controller = SettingsWindowController(store: settings, hotKey: hotKey)
@@ -128,7 +153,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.button?.toolTip = "SnapTranslate · \(shortcut.displayName) 截屏翻译"
     }
 
-    @objc private func beginCapture() {
+    @objc func beginCapture() {
+        guard !isTerminating else { return }
         if selector.isSelecting { selector.cancel(); return }
         let key: String
         do { key = try settings.loadAPIKey() }
@@ -151,39 +177,44 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func translate(_ region: SelectedRegion, apiKey: String, language: String) {
+        guard !isTerminating else { return }
         let identifier = UUID()
         activeRequestID = identifier
         let panel = resultPanel()
         panel.showLoading(near: region.rect)
+        let pipeline = pipeline
         translationTask = Task { [weak self] in
-            guard let self else { return }
+            // A cancelled system operation may take time to return. It must not
+            // keep the app delegate or a dismissed result window alive meanwhile.
             defer {
-                if self.activeRequestID == identifier { self.translationTask = nil }
+                if let self, self.activeRequestID == identifier {
+                    self.activeRequestID = nil
+                    self.translationTask = nil
+                }
             }
             do {
-                let image = try await ScreenCapture.capture(region)
                 try Task.checkCancellation()
-                _ = try await self.client.translate(
-                    imageData: image.data, mimeType: image.mimeType, apiKey: apiKey, targetLanguage: language
-                ) { [weak self] delta in
+                let image = try await pipeline.capture(region)
+                try Task.checkCancellation()
+                try await pipeline.translate(image, apiKey, language) { [weak self] delta in
                     await MainActor.run {
                         guard let self, self.activeRequestID == identifier else { return }
                         self.resultController?.append(delta: delta)
                     }
                 }
                 try Task.checkCancellation()
-                guard self.activeRequestID == identifier else { return }
-                panel.finish()
+                guard let self, self.activeRequestID == identifier else { return }
+                self.resultController?.finish()
             } catch {
-                guard !Task.isCancelled, self.activeRequestID == identifier else { return }
-                panel.showError(error)
+                guard !Task.isCancelled, let self, self.activeRequestID == identifier else { return }
+                self.resultController?.showError(error)
             }
         }
     }
 
     private func resultPanel() -> ResultPanelController {
         if let resultController { return resultController }
-        let controller = ResultPanelController()
+        let controller = makeResultPanel()
         controller.onClose = { [weak self] in
             self?.cancelTranslation()
             self?.resultController = nil
@@ -201,8 +232,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func ensureCapturePermission() -> Bool {
-        if CGPreflightScreenCaptureAccess() { return true }
-        if CGRequestScreenCaptureAccess() { return true }
+        if capturePermission() { return true }
         let alert = NSAlert()
         alert.messageText = "需要屏幕录制权限"
         alert.informativeText = ScreenCapturePermission.recoveryMessage + "\n\n应用仅在你框选区域后截取一张图片。"

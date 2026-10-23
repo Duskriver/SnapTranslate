@@ -1,7 +1,7 @@
 import Foundation
 import Darwin
 
-// Compile with TranslationCore's sources to measure request construction only.
+// Compile with TranslationCore's sources to construct and fully drain a request.
 // Synthetic bytes stand in for an already encoded image; no PNG encoding,
 // screen capture, credential lookup, URLSession, or network request is performed.
 private func memory() -> (current: Double, peak: Double) {
@@ -30,13 +30,26 @@ private func memory() -> (current: Double, peak: Double) {
         let request = try DeepSeekClient.makeRequest(
             imageData: input, mimeType: "image/png", apiKey: "synthetic-probe-key", targetLanguage: "简体中文"
         )
+        // Drain both representations into the same bounded sink. A lazy body
+        // must include all Base64 work, not just cheap stream construction.
+        let stream = request.httpBodyStream ?? InputStream(data: request.httpBody!)
+        stream.open()
+        var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+        var bodyBytes = 0
+        while true {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            precondition(count >= 0)
+            if count == 0 { break }
+            bodyBytes += count
+        }
+        stream.close()
         let elapsed = start.duration(to: clock.now)
         let sample = memory()
         let ms = Double(elapsed.components.seconds) * 1000 + Double(elapsed.components.attoseconds) / 1e15
         // Keep input and output alive at the sampling point for every run.
         withExtendedLifetime((input, request)) {
             print(String(format: "input_bytes=%d body_bytes=%d elapsed_ms=%.2f baseline_MiB=%.2f current_MiB=%.2f peak_MiB=%.2f",
-                         size, request.httpBody!.count, ms, baseline.current, sample.current, sample.peak))
+                         size, bodyBytes, ms, baseline.current, sample.current, sample.peak))
         }
     }
 }

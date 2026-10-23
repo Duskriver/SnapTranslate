@@ -69,7 +69,25 @@ struct RequestEncodingTests {
         let request = try DeepSeekClient.makeRequest(
             imageData: image, mimeType: mimeType, apiKey: "key", targetLanguage: language
         )
-        let data = try #require(request.httpBody)
+        let data = try readRequestBody(request)
         return try #require(JSONSerialization.jsonObject(with: data) as? [String: Any])
     }
+}
+
+// Tests deliberately materialize JSON to validate it; production never does.
+func readRequestBody(_ request: URLRequest) throws -> Data {
+    #expect(request.httpBody == nil)
+    let stream = try #require(request.httpBodyStream)
+    stream.open()
+    defer { stream.close() }
+    var data = Data()
+    var buffer = [UInt8](repeating: 0, count: 64 * 1_024)
+    while true {
+        let count = stream.read(&buffer, maxLength: buffer.count)
+        #expect(count >= 0)
+        if count <= 0 { break }
+        data.append(contentsOf: buffer.prefix(count))
+    }
+    #expect(request.value(forHTTPHeaderField: "Content-Length") == String(data.count))
+    return data
 }

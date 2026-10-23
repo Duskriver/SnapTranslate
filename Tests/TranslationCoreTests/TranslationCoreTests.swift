@@ -14,7 +14,7 @@ struct TranslationCoreTests {
         #expect(request.httpMethod == "POST")
         #expect(request.value(forHTTPHeaderField: "Authorization") == "Bearer test-key")
         #expect(request.value(forHTTPHeaderField: "Accept") == "text/event-stream")
-        let requestBody = try #require(request.httpBody)
+        let requestBody = try readRequestBody(request)
         let json = try #require(JSONSerialization.jsonObject(with: requestBody) as? [String: Any])
         #expect(json["model"] as? String == "deepseek-flash")
         #expect(json["stream"] as? Bool == true)

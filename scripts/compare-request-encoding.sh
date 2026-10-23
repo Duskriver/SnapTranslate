@@ -8,8 +8,14 @@ mkdir -p build
 PROBE_DIR="$(mktemp -d "$PROJECT_ROOT/build/request-encoding-comparison.XXXXXX")"
 mkdir -p "$PROBE_DIR/before" "$PROBE_DIR/after"
 git archive "$BASELINE_COMMIT" Sources/TranslationCore | tar -x -C "$PROBE_DIR/before"
-cp Sources/TranslationCore/*.swift "$PROBE_DIR/after/"
-cp benchmarks/RequestEncodingProbe.swift "$PROBE_DIR/RequestEncodingProbe.swift"
+if [ -n "${REQUEST_AFTER_REF:-}" ]; then
+    AFTER_COMMIT="$(git rev-parse --verify "$REQUEST_AFTER_REF^{commit}")"
+    git archive "$AFTER_COMMIT" Sources/TranslationCore | tar -x -C "$PROBE_DIR/after"
+    cp "$PROBE_DIR/after/Sources/TranslationCore/"*.swift "$PROBE_DIR/after/"
+else
+    cp Sources/TranslationCore/*.swift "$PROBE_DIR/after/"
+fi
+cp "${REQUEST_PROBE_SOURCE:-benchmarks/RequestEncodingProbe.swift}" "$PROBE_DIR/RequestEncodingProbe.swift"
 swiftc -O -swift-version 6 -parse-as-library "$PROBE_DIR/before/Sources/TranslationCore/"*.swift \
     "$PROBE_DIR/RequestEncodingProbe.swift" -o "$PROBE_DIR/before-probe"
 swiftc -O -swift-version 6 -parse-as-library "$PROBE_DIR/after/"*.swift \

@@ -61,7 +61,7 @@ python3 scripts/inspect-memory.py <PID>
 
 ## 请求编码基准与后续优化方向
 
-`RequestEncodingProbe.swift` 单独测量现有 `DeepSeekClient.makeRequest`：合成字节代表已经编码好的图片，保留输入和生成的 HTTP body 到采样点。它不执行 PNG 编码、截图、钥匙串读取或网络请求，也不代表完整应用峰值。每次测量启动新进程，耗时包含 Foundation 首次使用开销。
+`RequestEncodingProbe.swift` 单独测量 `DeepSeekClient.makeRequest`：合成字节代表已经编码好的图片，保留输入和请求到采样点。当前 probe 还会将请求体完整消费到 64 KiB 缓冲，让惰性编码的全部工作计入耗时；旧版的完整 Data 和新版的输入流使用相同消费方式。它不执行 PNG 编码、截图、钥匙串读取或网络请求，也不代表完整应用峰值。每次测量启动新进程，耗时包含 Foundation 首次使用开销。下列历史两组结果使用尚未添加消费步骤的原始 probe，本轮流式上传对照见文末。
 
 ```sh
 REQUEST_PROBE_DIR="$(mktemp -d "${TMPDIR:-/tmp}/snaptranslate-request-probe.XXXXXX")"
@@ -91,7 +91,9 @@ done
 下面是同一轮的新旧对照，不使用上面的历史单侧数据计算收益。环境与编译参数相同，完全复用未改动的 `RequestEncodingProbe.swift`，每个尺寸新旧各 5 次独立进程，交替先后顺序；耗时不含输入合成，包含请求构造和 Foundation 首次使用开销。
 
 ```sh
-./scripts/compare-request-encoding.sh ab94ff46aa81dc162429d2ccac5511ac9f8ece87 \
+git show 999fe4e:benchmarks/RequestEncodingProbe.swift > /tmp/request-encoding-original-probe.swift
+REQUEST_AFTER_REF=999fe4e REQUEST_PROBE_SOURCE=/tmp/request-encoding-original-probe.swift \
+  ./scripts/compare-request-encoding.sh ab94ff46aa81dc162429d2ccac5511ac9f8ece87 \
   > /tmp/request-encoding-comparison.csv
 ```
 
@@ -115,7 +117,7 @@ done
 
 后续优先考虑：
 
-- 上传阶段：请求构造的完整字符串中间副本已移除；进一步检查原始图片 Data 与最终 JSON body 在上传、等待结果时的存活时间。当前基准未覆盖 URLSession 持有请求体的开销。
+- 上传阶段：已完成按需编码请求体，不再保留完整 JSON Data；新增 URLSession 本地 HTTP 上传对照，见文末「流式上传内存对照」。原始图片仍保留以支持重发，后续可继续分析响应开始后的持有时间。
 - 快速重复截图：已改为后台串行 PNG 编码，并在创建截图位图前排队；效果、取消语义及延迟代价见下文「PNG 串行编码对照」。
 - 图片策略：800 万像素的 BGRA 像素数据本身约 30.5 MiB，另有编码开销。降低像素上限或尝试 JPEG 前，应先测小字、表格和代码截图的翻译质量；不直接把更低清晰度当成无损优化。
 
@@ -181,3 +183,61 @@ done
 原始数据：[results/2026-10-23-png-encoding-comparison.csv](results/2026-10-23-png-encoding-comparison.csv)，共 40 条。共用 probe 的 SHA-256 为 `66c6142a7901774b9e085bc5380b100311f41875427722ace4c46015696c0bb1`；旧版 `ScreenCapture.swift` 为 `64aaf56938eebd080a55d1bd6dc7a74be1a2eb7e993b78cb74f7647ca7fc57f9`；新版为 `55631106e92cd26abaf4e123622532d8d3bac9e412fa81df909e2714c7bf5121`；新版 `PNGEncoder.swift` 为 `ea88ee8be3abdcb949234fc1aa701622fd215bc6df176170258779c8ba982617`。这些是加入基准适配器前的生产源码哈希，运行时副本保留在脚本输出的目录中。
 
 运行不读取屏幕、密钥或网络，也不启动界面检查工具；未覆盖真实 ScreenCaptureKit、显示器/权限变化、WindowServer/GPU、XPC、上传或模型响应。合成图像的可压缩性不同于任意真实截图，具体数值与收益不能直接推广到完整应用。复测时不要并行运行构建、测试或其他基准。
+
+## 流式上传内存对照
+
+### 开销定位与本轮选择
+
+此前框选、流式文本和重复截图已分别优化。现有分阶段测量显示，大块内存主要来自截图位图以及上传图片/请求体：800 万像素 BGRA 原始像素本身约 30.5 MiB，单次 PNG 编码隔离进程峰值约 35.5 MiB，连续取消压力下约 43.4 MiB；这些是上节 PNG 基准的结果。本轮本地 HTTP 测得旧版 10 MiB 输入在请求准备完成时约 26.0 MiB、上传和等待期间峰值约 31.7 MiB。结果窗口 512 次更新的历史隔离峰值约 17.8 MiB。
+
+这些峰值属于不同进程和工作负载，不能相加或据此计算完整应用的内存构成比例。2026-10-23 对运行中应用的一次 `inspect-memory.py` 只读快照为 25.3 MiB、历史峰值 28.5 MiB，未发现活动的关联 XPC；未控制该进程的使用历史，因此不用于优化前后比较。
+
+在保持分辨率与 PNG 无损数据不变的前提下，优先移除可明确归因的 **完整 Base64 JSON 请求体**：10 MiB 图片生成 13,981,827 字节请求体，旧版在上传和等待时同时持有它与原图，网络设施还会有额外缓冲。新版 `RequestBodyStream` 根据 URLSession 的读取进度生成最多 64 KiB 的编码块（48 KiB 输入），不生成完整 JSON Data，也不创建临时文件或生产线程。保留原图用于请求重发，设置精确 Content-Length，提示词、模型、格式、图像质量与请求上限均未改变。
+
+使用 Foundation 支持的 [请求体流与异步字节响应](https://developer.apple.com/documentation/foundation/urlsession/bytes(for:delegate:))；需要重发时由 [task delegate 提供新流](https://developer.apple.com/documentation/foundation/urlsessiontaskdelegate/urlsession(_:task:neednewbodystream:))。编码在网络消费者线程按需执行，取消仍由原有 URLSession 失效路径处理，不添加常驻任务或定时器。
+
+### 复跑与测量口径
+
+旧版为本轮优化前的提交 `999fe4ec18d562a29f806a00db1da50660e27d06`，新版取工作区；两侧使用相同 probe、输入、`swiftc -O -swift-version 6` 和新进程。Apple Silicon、macOS 27.0.1、Swift 6.4；每个尺寸新旧各 5 次，交替先后顺序，以下为中位数。不要同时运行构建、测试或其他基准。
+
+```sh
+# 请求构造 + 完整消费，包含新版延迟到读取时发生的全部 Base64 编码。
+./scripts/compare-request-encoding.sh 999fe4e > /tmp/streamed-request-encoding.csv
+
+# 真实 URLSession 上传至本机 HTTP 服务，保留 SSE 响应读取路径。
+./scripts/compare-upload-memory.sh 999fe4e > /tmp/upload-memory-comparison.csv
+```
+
+脚本在忽略的 `build/*-comparison.*` 下保留源码副本与二进制，CSV 写至 stdout，环境与校验信息写至 stderr。上传脚本只在这些副本中把 URL 改为 `127.0.0.1` 的随机端口，生产 URL 保持不变。所有请求使用合成字节和占位密钥。
+
+编码 probe 将两种请求体都读入相同的 64 KiB 消费缓冲；计时从构造请求到消费完毕，包含运行时首次使用，不包含输入生成。保留输入及请求到采样点，不把创建输入流的时间冒充完整编码时间。原始数据：[streamed-request-encoding.csv](results/2026-10-23-streamed-request-encoding.csv)，共 30 条。
+
+| 合成输入 | 峰值 MiB：旧 → 新 | 完整编码/消费 ms：旧 → 新 |
+| --- | ---: | ---: |
+| 64 KiB | 2.58 → 2.55 | 2.33 → 2.00 |
+| 1 MiB | 4.81 → 3.50 | 1.76 → 1.80 |
+| 10 MiB | 25.86 → 12.52 | 5.33 → 4.35 |
+
+10 MiB 编码/消费的峰值下降 **51.6%**，耗时下降 **18.4%**；峰值范围旧版 25.83–25.89 MiB、新版 12.52–12.55 MiB，耗时范围旧版 5.26–5.41 ms、新版 4.28–4.48 ms。三个尺寸输出字节数分别为 88,195、1,398,915、13,981,827，新旧一致。小输入主要受首次使用与调度影响，不宣称稳定提速。
+
+上传 probe 实际执行 `DeepSeekClient.translate`，只有测试中将刷新间隔设为零以准确采样首段响应。服务器接收完整请求后立即返回第一段 SSE，然后等待 100 ms，再发送完成事件；所有运行使用相同等待。JSON 与图片解码校验放在发送完成事件之后，服务器不计入客户端内存/CPU。计时不含输入生成和进程启动，包含请求构造、URLSession 初始化、上传与响应解析。输入保留到采样点。
+
+| 合成输入 | 上传流程峰值 MiB：旧 → 新 | 请求开始至首段 SSE ms：旧 → 新 | 含等待的总耗时 ms：旧 → 新 | 客户端 CPU ms：旧 → 新 |
+| --- | ---: | ---: | ---: | ---: |
+| 64 KiB | 4.50 → 4.49 | 12.34 → 11.44 | 117.41 → 116.66 | 10.76 → 9.80 |
+| 1 MiB | 7.97 → 5.61 | 13.43 → 13.43 | 118.76 → 118.76 | 11.98 → 12.53 |
+| 10 MiB | 31.67 → 14.80 | 14.88 → 11.27 | 119.27 → 116.23 | 14.01 → 13.04 |
+
+10 MiB 上传流程峰值下降 **53.3%**，峰值范围旧版 30.61–33.17 MiB、新版 14.56–15.36 MiB；等待首段译文后的当前占用中位数为 31.66 → 14.74 MiB。请求开始至首段 SSE 的范围为旧版 12.48–23.50 ms、新版 10.95–15.29 ms，含等待总耗时为 114.35–128.51 → 116.14–120.03 ms，均有重叠。耗时无明显整体退化，但不由这组本地结果推断公网或模型翻译提速比例。原始数据：[upload-memory-comparison.csv](results/2026-10-23-upload-memory-comparison.csv)，共 30 条。
+
+正式采样前，脚本分别验证新旧版本的 HTTP 307/308 重发、上传中取消、响应中取消和提前 HTTP 401。取消上传时服务器确认收到的字节少于 Content-Length，取消响应时确认连接关闭。全部正常请求及重发的 body SHA-256 一致，JSON 结构、Base64、原图字节和返回译文均验证通过。重定向仍使用系统原有的 Authorization 处理行为，脚本不在重定向中补发认证头。
+
+内存统一为 Mach `phys_footprint` / `ledger_phys_footprint_peak`，不是 RSS；峰值包含客户端启动、合成输入及运行时。这些隔离测量不覆盖真实屏幕捕获、PNG 编码、完整界面、WindowServer/GPU、XPC、TLS、公网和模型推理，也不代表完整应用峰值降低同样比例。服务端仅用于模拟 SSE 与验证数据，其进程开销未纳入数字；没有真实 DeepSeek 请求或凭据读取。
+
+测量文件 SHA-256：
+
+- `DeepSeekClient.swift`：`48ea3a4cf9fcb4826fe4c0e1be721182877289a27d4881ec8dd95b43dd8b7e3e`
+- `RequestBodyStream.swift`：`77740d3d0bb1733294a735224c54c50f0fb99469e6cabd91df33772cf0549d8e`
+- `RequestEncodingProbe.swift`：`93c02ba87b644b96f27aab098164151bb9ab6efda56aefebf05ae312925734b0`
+- `UploadMemoryProbe.swift`：`1652206a807287692ab3c201bfa3443fbc1ae037598898ea2a8b350179cccb25`
+- `upload_memory_server.py`：`731fd0ce954254020cf58afb83e5c0805f8513006f5dc841cfef7a6b24105184`

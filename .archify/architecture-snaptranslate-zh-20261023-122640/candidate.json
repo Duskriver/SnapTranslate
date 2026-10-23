@@ -1,0 +1,402 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "SnapTranslate 架构图",
+    "locale": "zh-CN",
+    "output": ".archify/architecture-snaptranslate-zh-20261023-122640/snaptranslate-zh.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Duskriver/SnapTranslate.git",
+      "revision": "ab94ff46aa81dc162429d2ccac5511ac9f8ece87"
+    }
+  },
+  "components": [
+    {
+      "id": "person",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "Option + Shift + T / 菜单",
+      "pos": [
+        40,
+        40
+      ],
+      "size": [
+        210,
+        76
+      ],
+      "sources": [
+        {
+          "path": "Sources/SnapTranslate/GlobalHotKey.swift",
+          "line": 11,
+          "end_line": 35,
+          "label": "事件驱动的全局快捷键"
+        },
+        {
+          "path": "Sources/SnapTranslate/AppMain.swift",
+          "line": 54,
+          "end_line": 78,
+          "label": "菜单截图入口"
+        }
+      ]
+    },
+    {
+      "id": "coordinator",
+      "type": "backend",
+      "label": "截图与任务协调",
+      "sublabel": "AppDelegate + RegionSelector",
+      "pos": [
+        440,
+        40
+      ],
+      "size": [
+        250,
+        90
+      ],
+      "sources": [
+        {
+          "path": "Sources/SnapTranslate/AppMain.swift",
+          "line": 114,
+          "end_line": 199,
+          "label": "前置检查、任务归属与回调"
+        },
+        {
+          "path": "Sources/SnapTranslate/RegionSelector.swift",
+          "line": 18,
+          "end_line": 76,
+          "label": "区域选择与遮罩清理"
+        },
+        {
+          "path": "Sources/SnapTranslate/AppMain.swift",
+          "line": 28,
+          "end_line": 38,
+          "label": "启动及缺少密钥处理"
+        }
+      ],
+      "tag": "需密钥与屏幕录制权限"
+    },
+    {
+      "id": "capture",
+      "type": "backend",
+      "label": "屏幕截图",
+      "sublabel": "ScreenCaptureKit + PNG 编码",
+      "pos": [
+        940,
+        40
+      ],
+      "size": [
+        240,
+        90
+      ],
+      "sources": [
+        {
+          "path": "Sources/SnapTranslate/ScreenCapture.swift",
+          "line": 26,
+          "end_line": 81,
+          "label": "选区截图、大小限制与编码"
+        }
+      ],
+      "tag": "单个选区；排除本应用窗口"
+    },
+    {
+      "id": "settings",
+      "type": "frontend",
+      "label": "设置",
+      "sublabel": "设置窗口 + SettingsStore",
+      "pos": [
+        40,
+        310
+      ],
+      "size": [
+        230,
+        84
+      ],
+      "sources": [
+        {
+          "path": "Sources/SnapTranslate/SettingsWindowController.swift",
+          "line": 32,
+          "end_line": 57,
+          "label": "加载并清空密钥输入框"
+        },
+        {
+          "path": "Sources/SnapTranslate/SettingsWindowController.swift",
+          "line": 124,
+          "end_line": 134,
+          "label": "保存密钥与目标语言"
+        },
+        {
+          "path": "Sources/SnapTranslate/SettingsStore.swift",
+          "line": 12,
+          "end_line": 54,
+          "label": "持久化读写操作"
+        }
+      ]
+    },
+    {
+      "id": "result",
+      "type": "frontend",
+      "label": "译文浮窗",
+      "sublabel": "ResultPanelController / AppKit",
+      "pos": [
+        440,
+        310
+      ],
+      "size": [
+        250,
+        84
+      ],
+      "sources": [
+        {
+          "path": "Sources/SnapTranslate/ResultPanelController.swift",
+          "line": 19,
+          "end_line": 38,
+          "label": "浮窗与 Esc 关闭"
+        },
+        {
+          "path": "Sources/SnapTranslate/ResultPanelController.swift",
+          "line": 66,
+          "end_line": 124,
+          "label": "流式更新、部分译文与错误"
+        },
+        {
+          "path": "Sources/SnapTranslate/ResultPanelController.swift",
+          "line": 276,
+          "end_line": 305,
+          "label": "关闭回调与复制操作"
+        }
+      ],
+      "tag": "出错时已有译文仍可复制"
+    },
+    {
+      "id": "translation",
+      "type": "backend",
+      "label": "翻译核心",
+      "sublabel": "DeepSeekClient + SSE 解析",
+      "pos": [
+        940,
+        310
+      ],
+      "size": [
+        240,
+        84
+      ],
+      "sources": [
+        {
+          "path": "Sources/TranslationCore/DeepSeekClient.swift",
+          "line": 15,
+          "end_line": 107,
+          "label": "流式处理、取消与会话"
+        },
+        {
+          "path": "Sources/TranslationCore/DeepSeekClient.swift",
+          "line": 110,
+          "end_line": 147,
+          "label": "输入校验与请求构造"
+        },
+        {
+          "path": "Sources/TranslationCore/SSEParser.swift",
+          "line": 3,
+          "end_line": 113,
+          "label": "SSE 分帧与完成条件"
+        }
+      ],
+      "tag": "临时 URLSession"
+    },
+    {
+      "id": "keychain",
+      "type": "database",
+      "label": "macOS 钥匙串",
+      "sublabel": "仅本机保存 API Key",
+      "pos": [
+        40,
+        570
+      ],
+      "size": [
+        230,
+        76
+      ],
+      "sources": [
+        {
+          "path": "Sources/SnapTranslate/SettingsStore.swift",
+          "line": 17,
+          "end_line": 61,
+          "label": "读取、保存与删除密钥"
+        }
+      ],
+      "tag": "解锁后可访问；禁用同步"
+    },
+    {
+      "id": "preferences",
+      "type": "database",
+      "label": "UserDefaults",
+      "sublabel": "目标语言偏好",
+      "pos": [
+        440,
+        570
+      ],
+      "size": [
+        250,
+        76
+      ],
+      "sources": [
+        {
+          "path": "Sources/SnapTranslate/SettingsStore.swift",
+          "line": 5,
+          "end_line": 15,
+          "label": "语言存储与默认值"
+        }
+      ],
+      "tag": "默认：简体中文"
+    },
+    {
+      "id": "deepseek",
+      "type": "cloud",
+      "label": "DeepSeek API",
+      "sublabel": "api.deepseek.com",
+      "pos": [
+        940,
+        570
+      ],
+      "size": [
+        240,
+        76
+      ],
+      "sources": [
+        {
+          "path": "Sources/TranslationCore/DeepSeekClient.swift",
+          "line": 132,
+          "end_line": 169,
+          "label": "接口地址、Bearer 密钥与模型"
+        },
+        {
+          "path": "Sources/TranslationCore/DeepSeekClient.swift",
+          "line": 208,
+          "end_line": 210,
+          "label": "原始图像细节设置"
+        },
+        {
+          "path": "Sources/TranslationCore/DeepSeekClient.swift",
+          "line": 30,
+          "end_line": 43,
+          "label": "HTTP 与 SSE 响应校验"
+        }
+      ],
+      "tag": "deepseek-flash / 流式响应"
+    }
+  ],
+  "connections": [
+    {
+      "id": "start",
+      "to": "coordinator",
+      "label": "快捷键 / 菜单",
+      "variant": "emphasis",
+      "from": "person"
+    },
+    {
+      "id": "capture-region",
+      "to": "capture",
+      "label": "选区；权限已通过",
+      "variant": "emphasis",
+      "from": "coordinator"
+    },
+    {
+      "id": "capture-image",
+      "to": "coordinator",
+      "label": "PNG 图像",
+      "variant": "default",
+      "from": "capture"
+    },
+    {
+      "id": "read-settings",
+      "to": "settings",
+      "label": "读取密钥与语言",
+      "variant": "default",
+      "from": "coordinator"
+    },
+    {
+      "id": "keychain-access",
+      "to": "keychain",
+      "label": "读取 / 保存 / 删除",
+      "variant": "security",
+      "from": "settings"
+    },
+    {
+      "id": "preference-access",
+      "to": "preferences",
+      "label": "读取 / 保存语言",
+      "variant": "default",
+      "from": "settings"
+    },
+    {
+      "id": "translate-request",
+      "to": "translation",
+      "label": "PNG + 密钥 + 语言",
+      "variant": "emphasis",
+      "from": "coordinator"
+    },
+    {
+      "id": "translate-update",
+      "to": "coordinator",
+      "label": "译文 / 错误",
+      "variant": "default",
+      "from": "translation"
+    },
+    {
+      "id": "render-result",
+      "to": "result",
+      "label": "更新 / 完成",
+      "variant": "emphasis",
+      "from": "coordinator"
+    },
+    {
+      "id": "close-result",
+      "to": "coordinator",
+      "label": "关闭：取消请求",
+      "variant": "default",
+      "from": "result"
+    },
+    {
+      "id": "api-request",
+      "to": "deepseek",
+      "label": "HTTPS POST + Bearer",
+      "variant": "emphasis",
+      "from": "translation"
+    },
+    {
+      "id": "api-response",
+      "to": "translation",
+      "label": "SSE 增量文本",
+      "variant": "default",
+      "from": "deepseek"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "使用流程与任务控制",
+      "items": [
+        "AppDelegate 在框选前检查密钥与屏幕录制权限；缺少密钥时打开设置窗口。",
+        "RegionSelector 将选区返回 AppDelegate，由后者负责截图、翻译、浮窗更新和任务取消。",
+        "开始新截图会取消上一次翻译；关闭浮窗也会取消请求。请求标识用于拒绝过期回调。"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "截图与网络传输",
+      "items": [
+        "选区限制在单个显示器内，排除本应用窗口；截图最长边 4096 像素、最多 800 万像素、PNG 最大 10 MiB。编码在 UI 执行器之外运行。",
+        "当前截图和翻译指令通过 HTTPS 直接发送至 DeepSeek；模型为 deepseek-flash，图像 detail 为 original，关闭思考模式。",
+        "SSE 文本约每 90 ms 合并更新；成功需收到 [DONE]、finish_reason=stop 且译文非空。流式处理出错时保留已收到的译文。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "本地状态与图示范围",
+      "items": [
+        "SettingsStore 负责访问钥匙串和 UserDefaults；密钥仅本机保存，解锁后可访问，并禁用同步。",
+        "每次翻译创建临时 URLSession，结束或取消时使其失效；关闭磁盘 HTTP 缓存、Cookie 存储与凭据存储。",
+        "本图展示运行时架构，将 AppDelegate 与 RegionSelector 合并表示；省略测试、构建工具和界面布局细节。此流程没有本地 OCR、代理服务器或翻译历史存储。"
+      ]
+    }
+  ]
+}

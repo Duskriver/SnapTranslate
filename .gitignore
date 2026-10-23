@@ -6,3 +6,9 @@ build/
 .env
 .env.*
 work/
+
+# Local architecture generation receipts contain machine-specific paths.
+/.archify/**/*.browser-check.json
+/.archify/**/*.delivery.json
+/.archify/**/*.finalize.json
+/.archify/**/*.finalize-summary.json

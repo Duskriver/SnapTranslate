@@ -25,7 +25,7 @@ struct PNGEncoder: Sendable {
         do {
             try Task.checkCancellation()
             let image = try await capture()
-            result = try await encode(image)
+            result = try await encode(consume image)
         } catch {
             await admission.release()
             throw error
@@ -35,9 +35,11 @@ struct PNGEncoder: Sendable {
         return result
     }
 
-    func encode(_ image: CGImage) async throws -> CapturedImage {
+    func encode(_ image: consuming CGImage) async throws -> CapturedImage {
         try Task.checkCancellation()
-        let job = Job(image: image)
+        // Move the bitmap into the job so suspended callers need not keep an
+        // extra owner after the worker has finished using it.
+        let job = Job(image: consume image)
         let result = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 guard job.install(continuation) else { return }
@@ -64,8 +66,25 @@ struct PNGEncoder: Sendable {
         }
         CGImageDestinationAddImage(destination, image, nil)
         guard CGImageDestinationFinalize(destination) else { throw CaptureError.encodingFailed }
-        guard CFDataGetLength(data) <= 10 * 1024 * 1024 else { throw CaptureError.imageTooLarge }
-        return CapturedImage(data: data as Data, mimeType: "image/png")
+        let count = CFDataGetLength(data)
+        guard count <= 10 * 1024 * 1024 else { throw CaptureError.imageTooLarge }
+        guard count > 0, let bytes = CFDataGetMutableBytePtr(data) else { throw CaptureError.encodingFailed }
+        // Finalization is the last writer. Bridging mutable CFData with `as Data`
+        // copies a large PNG while both it and the screenshot are still alive.
+        // Retain only the finished storage, not the destination or source image.
+        let storage = FinishedPNGStorage(data)
+        let png = Data(bytesNoCopy: bytes, count: count, deallocator: .custom { [storage] _, _ in
+            withExtendedLifetime(storage) {}
+        })
+        return CapturedImage(data: png, mimeType: "image/png")
+    }
+
+    // ImageIO never writes after finalization. This owner only keeps the CF
+    // allocation alive; it never reads or writes its bytes. Data's deallocator
+    // may run on any thread, and Data governs later access via copy-on-write.
+    private final class FinishedPNGStorage: @unchecked Sendable {
+        private let data: CFData
+        init(_ data: CFData) { self.data = data }
     }
 
     // All mutable state is protected by lock; continuations resume outside it.
@@ -78,7 +97,7 @@ struct PNGEncoder: Sendable {
         private var isCancelled = false
         private var isRunning = false
 
-        init(image: CGImage) { self.image = image }
+        init(image: consuming CGImage) { self.image = image }
 
         func install(_ continuation: CheckedContinuation<CapturedImage, any Error>) -> Bool {
             let installed = lock.withLock {

@@ -2,6 +2,7 @@ import CoreGraphics
 import Foundation
 import ImageIO
 import Testing
+import UniformTypeIdentifiers
 @testable import SnapTranslate
 
 @Suite(.serialized)
@@ -28,6 +29,62 @@ struct PNGEncoderTests {
         await #expect(throws: CaptureError.imageTooLarge) {
             try await PNGEncoder().encode(makeImage(width: 2048, height: 2048))
         }
+    }
+
+    @Test(arguments: [false, true])
+    func finishedStoragePreservesAlphaColorProfileAndPaddedRows(wideGamut: Bool) async throws {
+        let width = 17, height = 11, rowBytes = 17 * 4 + 16
+        var bytes = Data(repeating: 0xCD, count: rowBytes * height)
+        for y in 0..<height {
+            for x in 0..<width {
+                let offset = y * rowBytes + x * 4
+                let alpha = UInt8((x % 4 + 1) * 63)
+                bytes[offset] = alpha / 2
+                bytes[offset + 1] = alpha / 3
+                bytes[offset + 2] = alpha / 4
+                bytes[offset + 3] = alpha
+            }
+        }
+        let colorSpace = try #require(CGColorSpace(name: wideGamut ? CGColorSpace.displayP3 : CGColorSpace.sRGB))
+        let provider = try #require(CGDataProvider(data: bytes as CFData))
+        let image = try #require(CGImage(width: width, height: height, bitsPerComponent: 8, bitsPerPixel: 32,
+                                        bytesPerRow: rowBytes, space: colorSpace,
+                                        bitmapInfo: CGBitmapInfo(rawValue: bitmapInfo), provider: provider,
+                                        decode: nil, shouldInterpolate: false, intent: .defaultIntent))
+        let reference = try autoreleasepool {
+            let data = try #require(CFDataCreateMutable(nil, 0))
+            let destination = try #require(CGImageDestinationCreateWithData(data, UTType.png.identifier as CFString, 1, nil))
+            CGImageDestinationAddImage(destination, image, nil)
+            #expect(CGImageDestinationFinalize(destination))
+            return data as Data
+        }
+        let result = try await PNGEncoder().encode(image)
+        // Identical PNG bytes also preserve metadata and ImageIO's exact alpha
+        // conversion/rounding, rather than asserting a different rendering model.
+        #expect(result.data == reference)
+    }
+
+    @Test func largePNGOutlivesBitmapAndSupportsDataCopyOnWrite() async throws {
+        let lifetime = EncodingState()
+        let result = try await PNGEncoder().captureAndEncode {
+            makeImage(width: 1600, height: 1600, onRelease: { lifetime.released(1) })
+        }
+        await waitForRelease(lifetime, expected: [1])
+        #expect(result.data.count > 8 * 1_024 * 1_024 && result.data.count <= 10 * 1_024 * 1_024)
+        // Read after the worker's autorelease pool and source bitmap are gone.
+        let source = try #require(CGImageSourceCreateWithData(result.data as CFData, nil))
+        let image = try #require(CGImageSourceCreateImageAtIndex(source, 0, nil))
+        #expect(image.width == 1600 && image.height == 1600)
+        var copy = result.data
+        let index = copy.count / 2
+        let original = result.data[index]
+        copy[index] ^= 0xFF
+        #expect(result.data[index] == original)
+        #expect(copy[index] != original)
+        copy.append(0xA5)
+        #expect(copy.count == result.data.count + 1)
+        copy.removeAll(keepingCapacity: false)
+        #expect(result.data.prefix(8) == Data([137, 80, 78, 71, 13, 10, 26, 10]))
     }
 
     @Test func alreadyCancelledRequestNeverEntersEncoder() async {

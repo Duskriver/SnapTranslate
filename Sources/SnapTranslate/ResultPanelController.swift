@@ -8,8 +8,8 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
     var onOpenSettings: (() -> Void)?
     var onOpenScreenRecordingSettings: (() -> Void)?
 
-    private let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 396, height: 220))
-    private let scrollView = NSScrollView()
+    private let textView = NSTextView(frame: .zero)
+    private let scrollView = ResultScrollView()
     private let statusLabel = NSTextField(labelWithString: "")
     private let progress = NSProgressIndicator()
     private let copyButton = NSButton(title: "复制译文", target: nil, action: nil)
@@ -137,6 +137,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
     private let textAttributes: [NSAttributedString.Key: Any] = {
         let paragraph = NSMutableParagraphStyle()
         paragraph.lineSpacing = 4
+        paragraph.lineBreakMode = .byWordWrapping
         return [
             .font: NSFont.systemFont(ofSize: 15),
             .foregroundColor: NSColor.textColor,
@@ -177,13 +178,15 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         textView.minSize = .zero
         textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         textView.autoresizingMask = [.width]
+        textView.textContainer?.containerSize = NSSize(width: 0, height: CGFloat.greatestFiniteMagnitude)
         textView.textContainer?.widthTracksTextView = true
-        textView.textContainer?.containerSize = NSSize(width: 396, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.heightTracksTextView = false
         textView.setAccessibilityLabel("翻译结果")
 
         scrollView.documentView = textView
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
+        scrollView.horizontalScrollElasticity = .none
         scrollView.autohidesScrollers = true
         scrollView.drawsBackground = true
         scrollView.backgroundColor = .textBackgroundColor
@@ -318,6 +321,24 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         case .openSettings: onOpenSettings?()
         case .openScreenRecordingSettings: onOpenScreenRecordingSettings?()
         case nil: break
+        }
+    }
+}
+
+/// Keep the document fitted to the actual viewport, including scroller changes.
+/// Hiding the horizontal scroller alone does not constrain the document width.
+@MainActor
+private final class ResultScrollView: NSScrollView {
+    override func tile() {
+        super.tile()
+        guard let textView = documentView as? NSTextView, contentSize.width > 0 else { return }
+        if textView.frame.width != contentSize.width {
+            textView.setFrameSize(NSSize(width: contentSize.width, height: textView.frame.height))
+        }
+        // A previous scroll-to-caret or resize may have left a horizontal offset.
+        if contentView.bounds.minX != 0 {
+            contentView.scroll(to: NSPoint(x: 0, y: contentView.bounds.minY))
+            reflectScrolledClipView(contentView)
         }
     }
 }

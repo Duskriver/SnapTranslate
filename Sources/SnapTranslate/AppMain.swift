@@ -5,6 +5,7 @@ struct SnapTranslateMain {
     @MainActor
     static func main() {
         if CommandLine.arguments.contains(TranslationWorker.argument) { TranslationWorker.run() }
+        if CommandLine.arguments.contains(SettingsWorker.argument) { SettingsWorker.run() }
         let application = NSApplication.shared
         application.setActivationPolicy(.accessory)
         let delegate = AppDelegate()
@@ -21,9 +22,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let pipeline: TranslationPipeline
     private let capturePermission: () -> Bool
     private let makeResultPanel: () -> ResultPanelController
+    private let makeSettings: (SettingsStore, GlobalHotKey) -> any SettingsPresenting
     private var statusItem: NSStatusItem?
     private var captureMenuItems: [NSMenuItem] = []
-    private(set) var settingsController: SettingsWindowController?
+    private(set) var settingsController: (any SettingsPresenting)?
+    private var settingsTransition: Task<Void, Never>?
+    private var capturingRequests: Set<UUID> = []
+    private var wantsSettingsAfterCapture = false
     private(set) var resultController: ResultPanelController?
     private(set) var translationTasks: [UUID: Task<Void, Never>] = [:]
     var translationTask: Task<Void, Never>? { activeRequestID.flatMap { translationTasks[$0] } }
@@ -38,7 +43,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         capturePermission: @escaping () -> Bool = {
             CGPreflightScreenCaptureAccess() || CGRequestScreenCaptureAccess()
         },
-        makeResultPanel: @escaping () -> ResultPanelController = { ResultPanelController() }
+        makeResultPanel: @escaping () -> ResultPanelController = { ResultPanelController() },
+        makeSettings: @escaping (SettingsStore, GlobalHotKey) -> any SettingsPresenting = {
+            SettingsProcessController(store: $0, hotKey: $1)
+        }
     ) {
         self.settings = settings
         self.hotKey = hotKey
@@ -46,6 +54,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         self.pipeline = pipeline
         self.capturePermission = capturePermission
         self.makeResultPanel = makeResultPanel
+        self.makeSettings = makeSettings
         super.init()
     }
 
@@ -73,6 +82,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         guard !isTerminating else { return }
         isTerminating = true
+        wantsSettingsAfterCapture = false
+        settingsTransition?.cancel()
+        settingsTransition = nil
         hotKey.onPress = nil
         cancelTranslation()
         selector.cancel()
@@ -136,11 +148,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func showSettings() {
         guard !isTerminating else { return }
+        settingsTransition?.cancel()
         selector.cancel()
+        // A settings child launched after a capture's window snapshot would not
+        // be in that snapshot's process exclusions. Wait until pixels are read.
+        if !capturingRequests.isEmpty {
+            wantsSettingsAfterCapture = true
+            return
+        }
+        wantsSettingsAfterCapture = false
+        if let controller = settingsController, controller.isClosing {
+            afterSettingsClose(controller) { $0.showSettings() }
+            return
+        }
         if settingsController == nil {
-            let controller = SettingsWindowController(store: settings, hotKey: hotKey)
+            let controller = makeSettings(settings, hotKey)
             controller.onSave = { [weak self] in self?.updateShortcutPresentation() }
-            controller.onClose = { [weak self] in self?.settingsController = nil }
+            controller.onClose = { [weak self] in
+                guard let self else { return }
+                self.settingsController = nil
+                if self.isTerminating { self.hotKey.unregister() }
+            }
+            if let process = controller as? SettingsProcessController {
+                process.onError = { [weak self] message in
+                    guard let self, !self.isTerminating else { return }
+                    self.showAlert(title: "设置暂不可用", message: message)
+                }
+                process.onQuit = { NSApplication.shared.terminate(nil) }
+                process.onCapture = { [weak self] in self?.beginCapture() }
+            }
             settingsController = controller
         }
         settingsController?.present()
@@ -158,6 +194,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc func beginCapture() {
         guard !isTerminating else { return }
+        wantsSettingsAfterCapture = false
+        settingsTransition?.cancel()
+        if let controller = settingsController {
+            // Reap the settings process before selection can capture a secure field.
+            controller.close()
+            afterSettingsClose(controller) { $0.beginCapture() }
+            return
+        }
         if selector.isSelecting { selector.cancel(); return }
         let key: String
         do { key = try settings.loadAPIKey() }
@@ -170,8 +214,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if !pipeline.presentsResult { cancelTranslation() }
         resultController?.dismiss()
         guard ensureCapturePermission() else { return }
-        // A secure key field must never appear in the source screenshot.
-        settingsController?.close()
         let language = settings.targetLanguage
         selector.begin { [weak self] region in
             guard let self, let region else { return }
@@ -179,9 +221,20 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
+    private func afterSettingsClose(_ controller: any SettingsPresenting,
+                                    action: @escaping @MainActor (AppDelegate) -> Void) {
+        settingsTransition = Task { [weak self] in
+            await controller.waitForClose()
+            guard !Task.isCancelled, let self, !self.isTerminating else { return }
+            self.settingsTransition = nil
+            action(self)
+        }
+    }
+
     private func translate(_ region: SelectedRegion, apiKey: String, language: String) {
         guard !isTerminating else { return }
         let identifier = UUID()
+        capturingRequests.insert(identifier)
         activeRequestID = identifier
         if !pipeline.presentsResult { resultPanel().showLoading(near: region.rect) }
         let pipeline = pipeline
@@ -192,6 +245,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 if let self {
                     self.translationTasks.removeValue(forKey: identifier)
                     if self.activeRequestID == identifier { self.activeRequestID = nil }
+                    self.captureCompleted(identifier)
                 }
             }
             do {
@@ -211,6 +265,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         case .quit: NSApplication.shared.terminate(nil)
                         }
                     }
+                }, onCaptureComplete: { [weak self] in
+                    await MainActor.run { self?.captureCompleted(identifier) }
                 })
                 try await pipeline.run(region, apiKey, language, delivery)
                 try Task.checkCancellation()
@@ -222,6 +278,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self.resultController?.showError(error)
             }
         }
+    }
+
+    private func captureCompleted(_ id: UUID) {
+        capturingRequests.remove(id)
+        if capturingRequests.isEmpty, wantsSettingsAfterCapture { showSettings() }
     }
 
     private func resultPanel() -> ResultPanelController {

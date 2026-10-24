@@ -44,6 +44,7 @@ enum TranslationWorker {
     }
 
     enum Event: Codable, Sendable {
+        case captured(UUID)
         case closed(UUID)
         case action(UUID?, Action)
         case idle
@@ -70,7 +71,10 @@ enum TranslationWorker {
         parentExit.setEventHandler { exit(0) }
         parentExit.resume()
         let writer = WorkerEventWriter()
-        let server = WorkerWindowServer(emit: writer.send)
+        let server = WorkerWindowServer(emit: writer.send, operation: { request, screen, onDelta in
+            try await WorkerWindowServer.performTranslation(request, screen: screen, onDelta: onDelta,
+                                                           onCaptured: { writer.send(.captured(request.id)) })
+        })
         server.installMenu()
         application.delegate = server
         Task { @MainActor in
@@ -128,7 +132,9 @@ final class WorkerWindowServer: NSObject, NSApplicationDelegate {
     private var captureMenuItem: NSMenuItem?
 
     init(emit: @escaping (TranslationWorker.Event) -> Void,
-         operation: @escaping Operation = WorkerWindowServer.performTranslation) {
+         operation: @escaping Operation = { request, screen, onDelta in
+             try await WorkerWindowServer.performTranslation(request, screen: screen, onDelta: onDelta)
+         }) {
         self.emit = emit
         self.operation = operation
     }
@@ -166,11 +172,16 @@ final class WorkerWindowServer: NSObject, NSApplicationDelegate {
     }
 
     static func performTranslation(_ request: TranslationWorker.Request, screen: NSScreen,
-                                   onDelta: @escaping @Sendable (String) async -> Void) async throws {
-        let image = try await ScreenCapture.capture(
-            SelectedRegion(rect: request.rect, screen: screen),
-            excludingProcessIDs: [request.parentPID, getpid()]
-        )
+                                   onDelta: @escaping @Sendable (String) async -> Void,
+                                   onCaptured: () -> Void = {}) async throws {
+        let image: CapturedImage
+        do {
+            image = try await ScreenCapture.capture(
+                SelectedRegion(rect: request.rect, screen: screen),
+                excludingProcessIDs: [request.parentPID, getpid()]
+            )
+        } catch { onCaptured(); throw error }
+        onCaptured()
         // Capture before waiting on network admission. A slow API response must
         // not defer reading the user's selected page until its content changes.
         let admission = WorkerNetworkAdmission.shared

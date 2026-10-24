@@ -59,9 +59,9 @@ for before, after in [
     assert s.count(before) == 1, before
     s = s.replace(before, after)
 if sys.argv[3] == '1':
-    before = '        let server = WorkerWindowServer(emit: writer.send)'
+    before = '        application.delegate = server'
     assert s.count(before) == 1
-    s = s.replace(before, before + '\n        multiInstallWorkerControl(server)')
+    s = s.replace(before, '        multiInstallWorkerControl(server)\n' + before)
     before = '        let admission = WorkerNetworkAdmission.shared'
     assert s.count(before) == 1
     s = s.replace(before, '        multiValidateRealCapture(image)\n' + before)

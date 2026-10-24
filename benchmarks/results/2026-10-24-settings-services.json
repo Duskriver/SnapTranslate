@@ -1,0 +1,164 @@
+[
+  {
+    "version": "before",
+    "run": 1,
+    "stage": "closed-5",
+    "report": {
+      "scope": "Main process, child processes and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 43131,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 29.9,
+          "peak_mib": 31.5
+        },
+        {
+          "pid": 43133,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 43131,
+          "footprint_mib": 2.438,
+          "peak_mib": 4.266
+        }
+      ],
+      "sampled_footprint_sum_mib": 32.338,
+      "optional_ui_service_count": 0,
+      "errors": []
+    }
+  },
+  {
+    "version": "before",
+    "run": 2,
+    "stage": "closed-5",
+    "report": {
+      "scope": "Main process, child processes and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 43242,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 29.8,
+          "peak_mib": 31.3
+        },
+        {
+          "pid": 43243,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 43242,
+          "footprint_mib": 2.484,
+          "peak_mib": 4.266
+        }
+      ],
+      "sampled_footprint_sum_mib": 32.284,
+      "optional_ui_service_count": 0,
+      "errors": []
+    }
+  },
+  {
+    "version": "before",
+    "run": 3,
+    "stage": "closed-5",
+    "report": {
+      "scope": "Main process, child processes and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 43277,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 30.1,
+          "peak_mib": 31.7
+        },
+        {
+          "pid": 43278,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 43277,
+          "footprint_mib": 2.469,
+          "peak_mib": 4.266
+        }
+      ],
+      "sampled_footprint_sum_mib": 32.569,
+      "optional_ui_service_count": 0,
+      "errors": []
+    }
+  },
+  {
+    "version": "after",
+    "run": 1,
+    "stage": "closed-5",
+    "report": {
+      "scope": "Main process, child processes and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 43156,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 13.6,
+          "peak_mib": 13.6
+        },
+        {
+          "pid": 43160,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 43156,
+          "footprint_mib": 2.344,
+          "peak_mib": 4.266
+        }
+      ],
+      "sampled_footprint_sum_mib": 15.944,
+      "optional_ui_service_count": 0,
+      "errors": []
+    }
+  },
+  {
+    "version": "after",
+    "run": 2,
+    "stage": "closed-5",
+    "report": {
+      "scope": "Main process, child processes and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 43206,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 13.2,
+          "peak_mib": 13.5
+        },
+        {
+          "pid": 43207,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 43206,
+          "footprint_mib": 2.391,
+          "peak_mib": 4.266
+        }
+      ],
+      "sampled_footprint_sum_mib": 15.591,
+      "optional_ui_service_count": 0,
+      "errors": []
+    }
+  },
+  {
+    "version": "after",
+    "run": 3,
+    "stage": "closed-5",
+    "report": {
+      "scope": "Main process, child processes and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 43301,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 13.6,
+          "peak_mib": 13.7
+        },
+        {
+          "pid": 43304,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 43301,
+          "footprint_mib": 2.406,
+          "peak_mib": 4.266
+        }
+      ],
+      "sampled_footprint_sum_mib": 16.006,
+      "optional_ui_service_count": 0,
+      "errors": []
+    }
+  }
+]

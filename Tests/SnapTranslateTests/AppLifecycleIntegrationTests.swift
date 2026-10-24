@@ -10,6 +10,44 @@ extension AppKitTests {
     @MainActor
     @Suite(.serialized)
     struct AppLifecycleIntegrationTests {
+        @Test func settingsWaitForPixelsButNotForNetworkResponse() async throws {
+            let fixture = try LifecycleFixture()
+            defer { fixture.cleanUp() }
+            try fixture.selectRegion()
+            try await fixture.probe.waitForCaptures(1)
+            fixture.app?.showSettings()
+            #expect(fixture.app?.settingsController == nil)
+            fixture.probe.captures[0].resolve(.success(testImage))
+            try await fixture.probe.waitForTranslations(1)
+            try await eventually { fixture.app?.settingsController != nil }
+            #expect(fixture.app?.translationTask != nil)
+        }
+
+        @Test(arguments: [false, true])
+        func captureWaitsForSettingsExitAndReopenSupersedesCapture(reopen: Bool) async throws {
+            var presenters: [DelayedSettingsPresenter] = []
+            let fixture = try LifecycleFixture(makeSettingsOverride: { _, _ in
+                let presenter = DelayedSettingsPresenter()
+                presenters.append(presenter)
+                return presenter
+            })
+            defer { fixture.cleanUp(); presenters.forEach { $0.finishClosing() } }
+            fixture.app?.showSettings()
+            let presenter = try #require(presenters.first)
+            fixture.app?.beginCapture()
+            #expect(presenter.isClosing)
+            #expect(!fixture.selector.isSelecting && fixture.keys.reads == 0)
+            if reopen { fixture.app?.showSettings() }
+            presenter.finishClosing()
+            if reopen {
+                try await eventually { presenters.count == 2 }
+                #expect(!fixture.selector.isSelecting && fixture.keys.reads == 0)
+            } else {
+                try await eventually { fixture.selector.isSelecting }
+                #expect(fixture.keys.reads == 1)
+            }
+        }
+
         @Test(arguments: [false, true])
         func replacementRejectsOldDeltasAndCompletion(failingOldRequest: Bool) async throws {
             let fixture = try LifecycleFixture()
@@ -96,6 +134,7 @@ extension AppKitTests {
         @Test func workerKeepsEarlierResultAndRejectsActionsAfterItCloses() async throws {
             let slot = WorkerDeliverySlot()
             let fixture = try LifecycleFixture(pipelineOverride: TranslationPipeline(presentsResult: true) { _, _, _, delivery in
+                await delivery.onCaptureComplete()
                 slot.delivery = delivery
                 try await withCheckedThrowingContinuation { slot.continuation = $0 }
             })
@@ -136,6 +175,7 @@ extension AppKitTests {
         @Test func multipleWorkerResultsRemainActiveUntilEachClosesAndQuitCancelsAll() async throws {
             var slots: [WorkerDeliverySlot] = []
             let fixture = try LifecycleFixture(pipelineOverride: TranslationPipeline(presentsResult: true) { _, _, _, delivery in
+                await delivery.onCaptureComplete()
                 let slot = WorkerDeliverySlot()
                 slot.delivery = delivery
                 slots.append(slot)
@@ -260,7 +300,8 @@ private final class LifecycleFixture {
     var app: AppDelegate?
     var selectionWindows: [WeakReference<NSWindow>] = []
 
-    init(pipelineOverride: TranslationPipeline? = nil) throws {
+    init(pipelineOverride: TranslationPipeline? = nil,
+         makeSettingsOverride: ((SettingsStore, GlobalHotKey) -> any SettingsPresenting)? = nil) throws {
         _ = NSApplication.shared
         defaults = try #require(UserDefaults(suiteName: suite))
         store = SettingsStore(defaults: defaults, keyStorage: keys)
@@ -279,6 +320,9 @@ private final class LifecycleFixture {
                 let panel = ResultPanelController()
                 panel.window?.alphaValue = 0
                 return panel
+            },
+            makeSettings: makeSettingsOverride ?? { store, hotKey in
+                SettingsWindowController(store: store, hotKey: hotKey)
             }
         )
     }
@@ -427,4 +471,27 @@ private func eventually(_ predicate: () -> Bool) async throws {
 @MainActor private final class WorkerDeliverySlot {
     var delivery: TranslationDelivery?
     var continuation: CheckedContinuation<Void, any Error>?
+}
+
+@MainActor private final class DelayedSettingsPresenter: SettingsPresenting {
+    var onSave: (() -> Void)?
+    var onClose: (() -> Void)?
+    private(set) var isClosing = false
+    private var finished = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func present() {}
+    func close() { isClosing = true }
+    func waitForClose() async {
+        if finished { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func finishClosing() {
+        guard !finished else { return }
+        finished = true
+        onClose?()
+        onClose = nil
+        let pending = waiters
+        waiters.removeAll()
+        for waiter in pending { waiter.resume() }
+    }
 }

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Read-only snapshot of an app and the active XPC services in its PID domains."""
+"""Read-only snapshot of an app, its children and active associated XPC services."""
 import argparse
 import json
 import re
@@ -44,6 +44,12 @@ def main():
     args = parser.parse_args()
     if args.pid <= 0:
         parser.error("PID must be positive")
+    children = {}
+    for line in command("ps", "-axo", "pid=,ppid=,comm=").splitlines():
+        fields = line.split(None, 2)
+        if len(fields) == 3:
+            pid, parent, name = fields
+            children.setdefault(int(parent), []).append((int(pid), name, int(parent)))
     pending = [(args.pid, "SnapTranslate", None)]
     visited = set()
     processes = []
@@ -55,6 +61,7 @@ def main():
         visited.add(pid)
         entry = {"pid": pid, "name": name, "owner_pid": owner}
         processes.append(entry)
+        pending.extend(children.get(pid, []))
         try:
             summary = command("vmmap", "-summary", str(pid))
             entry["footprint_mib"] = footprint_mib(summary)
@@ -70,7 +77,7 @@ def main():
         token in entry["name"] for token in ("ThemeWidgetControlViewService", "SafariPlatformSupport.Helper")
     )]
     report = {
-        "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+        "scope": "Main process, child processes and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
         "processes": processes,
         "sampled_footprint_sum_mib": round(sum(entry.get("footprint_mib", 0) for entry in processes), 3),
         "optional_ui_service_count": len(optional_ui_services),

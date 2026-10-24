@@ -79,11 +79,11 @@ extension AppKitTests {
             }
         }
 
-        @Test func closingRecoveryWindowDeliversActionBeforeItsRequestFinishes() async throws {
+        @Test func captureAndRecoveryCallbacksArriveBeforeTheirRequestFinishes() async throws {
             let item = request()
             let script = try """
             IFS= read -r line
-            printf '%s\\n' \(quoted(.action(item.id, .screenRecordingSettings))) \(quoted(.closed(item.id))) \(quoted(.idle))
+            printf '%s\\n' \(quoted(.captured(item.id))) \(quoted(.action(item.id, .screenRecordingSettings))) \(quoted(.closed(item.id))) \(quoted(.idle))
             IFS= read -r line
             case "$line" in *shutdown*) exit 0;; *) exit 7;; esac
             """
@@ -91,9 +91,12 @@ extension AppKitTests {
             defer { process.cancel() }
             let client = WorkerClient { process }
             var actions: [TranslationWorker.Action] = []
+            var captures = 0
             let delivery = TranslationDelivery(onDelta: { _ in }, onAction: { action in
                 try? await Task.sleep(for: .milliseconds(10))
-                await MainActor.run { actions.append(action) }
+                await MainActor.run { #expect(captures == 1); actions.append(action) }
+            }, onCaptureComplete: {
+                await MainActor.run { captures += 1 }
             })
             try await client.translate(item, delivery: delivery)
             #expect(actions == [.screenRecordingSettings])

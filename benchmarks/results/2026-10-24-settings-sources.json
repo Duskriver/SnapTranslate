@@ -1,0 +1,60 @@
+{
+  "before_commit": "0304cb2c01f49856ea4e7e679dd594fc619dd1ac",
+  "sha256": {
+    "before": {
+      "SnapTranslate/AppMain.swift": "b1834e6a7e692c691d6e32e4f8b7c737e77f7863e96f650454a621785d85968b",
+      "SnapTranslate/GlobalHotKey.swift": "6f206aa3bf201b2d2b25020c3dc5c59a5a256f2d35fe9bc87ce5033f093be9cd",
+      "SnapTranslate/KeyboardShortcut.swift": "e8f6dadfd60c5bde50f57c4de09298ab28c630e2df6e8239cb7e40610e5fba67",
+      "SnapTranslate/PNGEncoder.swift": "ac0f28317aa7f8c4368a7f59337542348c09b76f87744ebc3422d61d129afb8f",
+      "SnapTranslate/RegionSelector.swift": "ebc3318c18f51113fe920283557fb8be228b87ac5f821c5eeb14649fb02c6273",
+      "SnapTranslate/ResultErrorPresentation.swift": "46303457f69221cf3c89dcdfb2b828989202ab4d273636c8f4217c7989b81d53",
+      "SnapTranslate/ResultPanelController.swift": "674232ccbd7f17549d43118ce31e2a57eccd2632662edff764ea00a439323671",
+      "SnapTranslate/ScreenCapture.swift": "6ac8459a605fa63f220d8da94fcdda5a19ee080055320ff910ac8beebfcdd65a",
+      "SnapTranslate/ScreenCapturePermission.swift": "067d8af9639de29dada6742c47432f85a5574c948193e45f21c5b5ab32e6ac97",
+      "SnapTranslate/SettingsStore.swift": "b1048a254ee8c0acfa3c3a8a24cf8034f1c1ec78dbfe2fdcf7fceb87cb976419",
+      "SnapTranslate/SettingsWindowController.swift": "d39e297efd2e6d1c5b001df217d677bb0bef2c03329dc954b7cd4d908afbaa32",
+      "SnapTranslate/ShortcutRecorder.swift": "8d141db802c6712faee764d19660ce8a37a271253979a208cbb9d4f8d4312dec",
+      "SnapTranslate/TranslationPipeline.swift": "e01b00dab811b1e267cb6ab0e86bfbc61f79126d72c8f57daf2c5000d558cec8",
+      "SnapTranslate/TranslationWorker.swift": "f9c1400b349fd3cfc5bbc0c90429426f2bd529195c218f135bbd278f9065c24d",
+      "SnapTranslate/WindowResourcePolicy.swift": "14d6b7f1a659648f81dc107822f2f5737535d28aeedd708c19d1ee16c29569bc",
+      "SnapTranslate/WorkerClient.swift": "2452449d6ef8929e869b1aea3febfb96f73812a95240cf742e16b32018a506bc",
+      "SnapTranslate/WorkerNetworkAdmission.swift": "62e4ae3618a70063320508b7bd074d05983719128b8adf5560e32f5e9eff6cba",
+      "SnapTranslate/WorkerProcess.swift": "9f1f11468696397ae17412ec3b8b49acafb06f332e9495000cbed75d99e833a0",
+      "TranslationCore/DeepSeekClient.swift": "48ea3a4cf9fcb4826fe4c0e1be721182877289a27d4881ec8dd95b43dd8b7e3e",
+      "TranslationCore/RequestBodyStream.swift": "77740d3d0bb1733294a735224c54c50f0fb99469e6cabd91df33772cf0549d8e",
+      "TranslationCore/SSEParser.swift": "594e75f6d410ef2db7717a8828605ab6b69fb6445c5c8738a63b7f3969b01b14",
+      "TranslationCore/TranslationError.swift": "080f3f591dd3f85e1f1fa4e765282657fbc6fe1c14a8fcb302572deb782e1a2b"
+    },
+    "after": {
+      "SnapTranslate/AppMain.swift": "4336cc1484638d8a93a984c19f88267a0ea36d972ef8137e23d23a9f038449da",
+      "SnapTranslate/GlobalHotKey.swift": "6f206aa3bf201b2d2b25020c3dc5c59a5a256f2d35fe9bc87ce5033f093be9cd",
+      "SnapTranslate/KeyboardShortcut.swift": "e8f6dadfd60c5bde50f57c4de09298ab28c630e2df6e8239cb7e40610e5fba67",
+      "SnapTranslate/PNGEncoder.swift": "ac0f28317aa7f8c4368a7f59337542348c09b76f87744ebc3422d61d129afb8f",
+      "SnapTranslate/RegionSelector.swift": "ebc3318c18f51113fe920283557fb8be228b87ac5f821c5eeb14649fb02c6273",
+      "SnapTranslate/ResultErrorPresentation.swift": "46303457f69221cf3c89dcdfb2b828989202ab4d273636c8f4217c7989b81d53",
+      "SnapTranslate/ResultPanelController.swift": "674232ccbd7f17549d43118ce31e2a57eccd2632662edff764ea00a439323671",
+      "SnapTranslate/ScreenCapture.swift": "6ac8459a605fa63f220d8da94fcdda5a19ee080055320ff910ac8beebfcdd65a",
+      "SnapTranslate/ScreenCapturePermission.swift": "067d8af9639de29dada6742c47432f85a5574c948193e45f21c5b5ab32e6ac97",
+      "SnapTranslate/SettingsBackend.swift": "c4c999873c9d7cf16a1f12a9213f11b8ebd346892b08fb986ca4f39e2cb4a8f3",
+      "SnapTranslate/SettingsStore.swift": "b1048a254ee8c0acfa3c3a8a24cf8034f1c1ec78dbfe2fdcf7fceb87cb976419",
+      "SnapTranslate/SettingsWindowController.swift": "34faad8db157605e6d3179aa0ab239799d07a6aee2da4f7252d0f81a5df5a508",
+      "SnapTranslate/SettingsWorker.swift": "047b582ed5219d64468b97d14747ad88745d53d0b08b976e56aafeebfbf457b9",
+      "SnapTranslate/ShortcutRecorder.swift": "8d141db802c6712faee764d19660ce8a37a271253979a208cbb9d4f8d4312dec",
+      "SnapTranslate/TranslationPipeline.swift": "b49acc83c4a235bb7fb3a2dc04dcd83a4e6c3d18834e2157d77024cb15e1a845",
+      "SnapTranslate/TranslationWorker.swift": "5d91f0258ada1d95ca5dbcc108aabf26c4e8cedc7febff3d81a023db3eab887f",
+      "SnapTranslate/WindowResourcePolicy.swift": "14d6b7f1a659648f81dc107822f2f5737535d28aeedd708c19d1ee16c29569bc",
+      "SnapTranslate/WorkerClient.swift": "4afcaec81445c4670aaef6ee306e87c000ff439ebc5849082c44a5445487c15b",
+      "SnapTranslate/WorkerNetworkAdmission.swift": "62e4ae3618a70063320508b7bd074d05983719128b8adf5560e32f5e9eff6cba",
+      "SnapTranslate/WorkerProcess.swift": "e0b04ca2dd93a23d6fb9ff6743112e321df435fb46f55514a95638130c404f74",
+      "TranslationCore/DeepSeekClient.swift": "48ea3a4cf9fcb4826fe4c0e1be721182877289a27d4881ec8dd95b43dd8b7e3e",
+      "TranslationCore/RequestBodyStream.swift": "77740d3d0bb1733294a735224c54c50f0fb99469e6cabd91df33772cf0549d8e",
+      "TranslationCore/SSEParser.swift": "594e75f6d410ef2db7717a8828605ab6b69fb6445c5c8738a63b7f3969b01b14",
+      "TranslationCore/TranslationError.swift": "080f3f591dd3f85e1f1fa4e765282657fbc6fe1c14a8fcb302572deb782e1a2b"
+    },
+    "benchmark": {
+      "benchmarks/SettingsMemoryProbe.swift": "555158b1165a256d3b62c79338be34d4f1b1257f6ae8e157db6ed6ed96769234",
+      "benchmarks/SettingsMemoryObserver.py": "a994d9838c38323dfe120b439bc261d60adfc6730050faeae8b9648e1263a9bb",
+      "scripts/compare-settings-memory.sh": "8e2137bed0094e101874e0fdc66353659b6724f97c56c86c4ff457cded0d13f6"
+    }
+  }
+}

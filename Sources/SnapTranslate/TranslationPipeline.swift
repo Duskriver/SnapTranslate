@@ -3,6 +3,7 @@ import Foundation
 struct TranslationDelivery: Sendable {
     let onDelta: @Sendable (String) async -> Void
     let onAction: @Sendable (TranslationWorker.Action) async -> Void
+    var onCaptureComplete: @Sendable () async -> Void = {}
 }
 
 /// Production owns result windows in the shared disposable process. Injected
@@ -20,6 +21,7 @@ struct TranslationPipeline: Sendable {
         presentsResult = false
         run = { region, key, language, delivery in
             let image = try await capture(region)
+            await delivery.onCaptureComplete()
             try Task.checkCancellation()
             try await translate(image, key, language, delivery.onDelta)
         }

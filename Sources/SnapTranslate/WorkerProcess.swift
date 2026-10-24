@@ -71,6 +71,10 @@ final class WorkerProcess: @unchecked Sendable {
     }
 
     func events() -> AsyncThrowingStream<TranslationWorker.Event, any Error> {
+        events(of: TranslationWorker.Event.self)
+    }
+
+    func events<Value: Decodable & Sendable>(of type: Value.Type) -> AsyncThrowingStream<Value, any Error> {
         AsyncThrowingStream { continuation in
             continuation.onTermination = { [weak self] reason in
                 if case .cancelled = reason { self?.cancel() }
@@ -90,10 +94,10 @@ final class WorkerProcess: @unchecked Sendable {
         }
     }
 
-    private func readOutput(_ continuation: AsyncThrowingStream<TranslationWorker.Event, any Error>.Continuation) {
+    private func readOutput<Value: Decodable & Sendable>(_ continuation: AsyncThrowingStream<Value, any Error>.Continuation) {
         var error: (any Error)?
         do {
-            var decoder = WorkerEventDecoder()
+            var decoder = WorkerLineDecoder<Value>()
             while let data = try readWorkerChunk(output.fileHandleForReading, capacity: 16 * 1024) {
                 for event in try decoder.append(data) { continuation.yield(event) }
             }
@@ -111,7 +115,7 @@ final class WorkerProcess: @unchecked Sendable {
         }
     }
 
-    private func finish(_ continuation: AsyncThrowingStream<TranslationWorker.Event, any Error>.Continuation,
+    private func finish<Value: Sendable>(_ continuation: AsyncThrowingStream<Value, any Error>.Continuation,
                         error: (any Error)?) {
         try? input.fileHandleForWriting.close()
         try? input.fileHandleForReading.close()

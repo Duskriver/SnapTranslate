@@ -67,6 +67,8 @@ final class WorkerClient {
 
     private func handle(_ event: TranslationWorker.Event, in current: Session) async {
         switch event {
+        case .captured(let id):
+            if let pending = current.pending[id] { await pending.delivery.onCaptureComplete() }
         case .closed(let id): current.pending.removeValue(forKey: id)?.continuation.resume()
         case .action(let id, let action):
             let pending = id.flatMap { current.pending[$0] } ?? (id == nil ? current.pending.values.first : nil)

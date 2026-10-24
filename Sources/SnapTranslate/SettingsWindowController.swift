@@ -1,12 +1,11 @@
 import AppKit
 
 @MainActor
-final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+final class SettingsWindowController: NSWindowController, NSWindowDelegate, SettingsPresenting {
     var onSave: (() -> Void)?
     var onClose: (() -> Void)?
 
-    private let store: SettingsStore
-    private let hotKey: GlobalHotKey
+    private let backend: any SettingsBackend
     private let keyField = NSSecureTextField()
     private let languagePopup = NSPopUpButton()
     private let shortcutRecorder = ShortcutRecorder()
@@ -17,9 +16,12 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     private let deleteKeyButton = NSButton(title: "删除密钥", target: nil, action: nil)
     private var saveButton: NSButton!
 
-    init(store: SettingsStore, hotKey: GlobalHotKey) {
-        self.store = store
-        self.hotKey = hotKey
+    convenience init(store: SettingsStore, hotKey: GlobalHotKey) {
+        self.init(backend: SettingsCoordinator(store: store, hotKey: hotKey))
+    }
+
+    init(backend: any SettingsBackend) {
+        self.backend = backend
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 500, height: 440),
             styleMask: [.titled, .closable],
@@ -35,18 +37,18 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         shortcutRecorder.onValidation = { [weak self] message in self?.errorLabel.stringValue = message ?? "" }
         shortcutRecorder.onRecordingChanged = { [weak self] recording in
             guard let self else { return }
-            if recording {
-                self.hotKey.unregister()
-            } else {
-                do { try self.hotKey.register(self.store.captureShortcut) }
-                catch { self.errorLabel.stringValue = error.localizedDescription }
-            }
+            do { try self.backend.setRecording(recording) }
+            catch { self.errorLabel.stringValue = error.localizedDescription }
         }
         buildInterface(in: window)
         window.center()
     }
 
     required init?(coder: NSCoder) { nil }
+
+    func waitForClose() async {}
+
+    func showError(_ message: String) { errorLabel.stringValue = message }
 
     func present() {
         prepareForPresentation()
@@ -57,23 +59,17 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
 
     func prepareForPresentation() {
         shortcutRecorder.stopRecording()
-        shortcutRecorder.shortcut = store.captureShortcut
+        let state = backend.load()
+        shortcutRecorder.shortcut = state.shortcut
         errorLabel.stringValue = ""
         keyField.stringValue = ""
         removeSavedKey = false
-        do {
-            hasSavedKey = try store.hasAPIKey()
-            keyStatusLoaded = true
-            saveButton.isEnabled = true
-        } catch {
-            keyField.stringValue = ""
-            hasSavedKey = false
-            keyStatusLoaded = false
-            saveButton.isEnabled = false
-            errorLabel.stringValue = error.localizedDescription
-        }
+        hasSavedKey = state.hasSavedKey ?? false
+        keyStatusLoaded = state.hasSavedKey != nil
+        saveButton.isEnabled = keyStatusLoaded
+        errorLabel.stringValue = state.error ?? ""
         updateKeyControls()
-        languagePopup.selectItem(withTitle: store.targetLanguage)
+        languagePopup.selectItem(withTitle: state.language)
         if languagePopup.indexOfSelectedItem < 0 { languagePopup.selectItem(at: 0) }
         // A saved key does not need editing on every visit. Focusing the secure
         // field can launch macOS Password AutoFill even when it is not used.
@@ -183,27 +179,16 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
     @objc private func save() {
         guard keyStatusLoaded else { return }
         shortcutRecorder.stopRecording()
-        let previousShortcut = store.captureShortcut
-        do {
-            try hotKey.register(shortcutRecorder.shortcut)
-            do {
-                let replacement = keyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-                if !replacement.isEmpty || removeSavedKey {
-                    try store.saveAPIKey(replacement)
-                }
-            } catch {
-                let keychainError = error.localizedDescription
-                do { try hotKey.register(previousShortcut) }
-                catch { errorLabel.stringValue = "\(keychainError)\n\(error.localizedDescription)"; return }
-                errorLabel.stringValue = keychainError
-                return
-            }
-            store.captureShortcut = shortcutRecorder.shortcut
-            store.targetLanguage = languagePopup.titleOfSelectedItem ?? "简体中文"
-            onSave?()
-            close()
-        } catch {
-            errorLabel.stringValue = error.localizedDescription
+        let replacement = keyField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        let edit = SettingsEdit(shortcut: shortcutRecorder.shortcut,
+                                language: languagePopup.titleOfSelectedItem ?? "简体中文",
+                                replacementKey: !replacement.isEmpty || removeSavedKey ? replacement : nil)
+        saveButton.isEnabled = false
+        backend.save(edit) { [weak self] error in
+            guard let self else { return }
+            self.saveButton.isEnabled = true
+            if let error { self.errorLabel.stringValue = error }
+            else { self.onSave?(); self.close() }
         }
     }
 

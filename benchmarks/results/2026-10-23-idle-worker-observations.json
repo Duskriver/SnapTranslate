@@ -1,0 +1,55 @@
+{
+  "scope": "Concurrent main/child footprint samples at about 100 ms intervals, not deduplicated physical RAM; excluding XPC, WindowServer and GPU. Sampled maxima can miss brief peaks.",
+  "runs": [
+    {
+      "version": "before",
+      "run": 1,
+      "sampled_main_child_sum_max_mib": 25.65723419189453,
+      "maximum_child_count": 0,
+      "final_child_count": 0
+    },
+    {
+      "version": "before",
+      "run": 2,
+      "sampled_main_child_sum_max_mib": 25.57910919189453,
+      "maximum_child_count": 0,
+      "final_child_count": 0
+    },
+    {
+      "version": "before",
+      "run": 3,
+      "sampled_main_child_sum_max_mib": 25.657211303710938,
+      "maximum_child_count": 0,
+      "final_child_count": 0
+    },
+    {
+      "version": "after",
+      "run": 1,
+      "sampled_main_child_sum_max_mib": 38.236297607421875,
+      "maximum_child_count": 1,
+      "final_child_count": 0
+    },
+    {
+      "version": "after",
+      "run": 2,
+      "sampled_main_child_sum_max_mib": 37.03312683105469,
+      "maximum_child_count": 1,
+      "final_child_count": 0
+    },
+    {
+      "version": "after",
+      "run": 3,
+      "sampled_main_child_sum_max_mib": 38.704978942871094,
+      "maximum_child_count": 1,
+      "final_child_count": 0
+    }
+  ],
+  "png_uploads": {
+    "count": 30,
+    "bytes_each": 73207,
+    "width": 1740,
+    "height": 940,
+    "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627"
+  },
+  "probe_sha256": "04e9bb004a41a87658fcab3acd34d1ad251f73d906e72a737acaf0e818b4c50c"
+}

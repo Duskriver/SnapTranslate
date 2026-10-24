@@ -306,3 +306,21 @@ REQUEST_AFTER_REF=999fe4e REQUEST_PROBE_SOURCE=/tmp/request-encoding-original-pr
 测量使用 Mach physical footprint 及截至采样时刻的生命周期峰值，不是 RSS；包含合成输入和运行时，不含之后的解码验证与 SHA-256 计算。原图生成规则和编码调用在每组新旧版本之间一致，全部输入都是合成图，没有降低分辨率或使用有损压缩。未覆盖真实 ScreenCaptureKit、物理多屏、GPU/WindowServer、XPC、上传、模型服务或完整应用峰值；也没有重新测量真实截图质量或 macOS 14。不要与构建或其他基准并行运行。
 
 原始 probe SHA-256 为 `66c6142a7901774b9e085bc5380b100311f41875427722ace4c46015696c0bb1`，与上一轮 PNG 基准完全一致；补充 probe 为 `84568bf79af4b9749f96ea30251d1d3362ff5ca850e40a61200fd04cbfbb4298`。新版生产 `PNGEncoder.swift` 为 `ac0f28317aa7f8c4368a7f59337542348c09b76f87744ebc3422d61d129afb8f`；`ScreenCapture.swift` 未修改，仍为 `55631106e92cd26abaf4e123622532d8d3bac9e412fa81df909e2714c7bf5121`。脚本输出保存了加入相同计数器后的两侧源码快照和二进制。
+
+## 翻译关窗后的待机占用
+
+`./scripts/compare-idle-memory.sh 8867c76` 使用独立公开文本窗口、真实截图/PNG、loopback HTTP 和固定 SSE 响应比较旧版与当前源码。无需用户密钥或真实 API，先退出 SnapTranslate 以避免热键冲突；需要已有屏幕录制授权。新旧各 3 个新进程、每进程 5 次，交替顺序；成功后关闭实际结果窗口并采样。
+
+本轮待机中位数 23.89 → 14.52 MiB（新版冷启动 13.36 MiB），代价是启动延迟以及翻译期间更高的主/子进程占用之和。方法、完整数据、失败试跑与范围见 [2026-10-23 记录](results/2026-10-23-idle-worker.md)。该基准不使用 UI 自动化查询被测窗口，不测真实 API、关联 XPC、WindowServer/GPU 或整机新增物理内存。
+
+## 多个结果共用一个工作进程
+
+`./scripts/measure-multi-window-memory.sh` 运行三个全新进程，每个保留最多 10 个结果并执行三轮完整关闭/重开；实际执行截图、PNG、HTTP/SSE 和 AppKit 窗口，使用公开测试内容、本地固定响应和占位密钥，不读取用户凭据或调用真实 API。外部观察器采样主/工作进程的 physical footprint，阶段确认确保测量时窗口数稳定，另检查第一组的关联 XPC。
+
+保留 1 / 3 / 5 / 10 个已完成结果的占用之和中位数为 40.33 / 44.30 / 47.11 / 53.75 MiB；第三轮全部关窗后 15.09 MiB，冷启动 13.22 MiB，所有结束采样无工作进程。该和未去重共享页，不含 XPC/GPU，也不是大量截图同时上传的严格峰值。详情、范围和原始数据见 [多窗口记录](results/2026-10-23-multi-window.md)。
+
+## 多结果的真实 API 与原生关窗验证
+
+显式运行 `./scripts/measure-multi-window-memory.sh --real-api`，会使用应用正常钥匙串流程和生产 API 地址发出 7 次真实计费请求；默认不带参数仍使用本地模拟响应。测量副本校验选区必须与已知公开英文截图的 PNG 哈希相同，完成后通过原生窗口关闭路径逐个关窗，分别观察保留多个结果、全部关闭后静置和再次重开。公开图校验绑定本次显示环境，不一致会在上传前中止。
+
+本轮 5 个完成结果时两进程合计 47.33 MiB，最后关窗后 14.53 MiB，同一主进程冷启动 13.97 MiB。两轮工作进程都正常退出，第一轮额外确认其关联 SetStore 退出。指标不含 XPC/GPU、未去重共享页，也不是多组中位数。详细方法、边界、实际等待时间与逐阶段数据见 [真实 API 记录](results/2026-10-23-real-api-multi-window.md)。

@@ -1,0 +1,417 @@
+{
+  "scope": "One fresh signed diagnostic build; real production DeepSeek endpoint and existing Keychain credential. Seven real translations, two worker lifetimes. Main+worker current physical footprints summed without deduplicating shared pages; excludes XPC/WindowServer/GPU. No accessibility queries.",
+  "stages": [
+    {
+      "time": 1792802641.346716,
+      "main_pid": 21011,
+      "main_mib": 13.969642639160156,
+      "children": [],
+      "sum_mib": 13.969642639160156,
+      "stage": "startup",
+      "windows": 0
+    },
+    {
+      "time": 1792802651.4447842,
+      "main_pid": 21011,
+      "main_mib": 14.344642639160156,
+      "children": [
+        [
+          21083,
+          25.20410919189453
+        ]
+      ],
+      "sum_mib": 39.54875183105469,
+      "stage": "retained-1",
+      "windows": 1
+    },
+    {
+      "time": 1792802655.853811,
+      "main_pid": 21011,
+      "main_mib": 14.57904052734375,
+      "children": [
+        [
+          21083,
+          29.391632080078125
+        ]
+      ],
+      "sum_mib": 43.970672607421875,
+      "stage": "retained-3",
+      "windows": 3
+    },
+    {
+      "time": 1792802660.148799,
+      "main_pid": 21011,
+      "main_mib": 14.86029052734375,
+      "children": [
+        [
+          21083,
+          32.469757080078125
+        ]
+      ],
+      "sum_mib": 47.330047607421875,
+      "stage": "retained-5",
+      "windows": 5
+    },
+    {
+      "time": 1792802664.6921222,
+      "main_pid": 21011,
+      "main_mib": 14.62591552734375,
+      "children": [
+        [
+          21083,
+          31.657257080078125
+        ]
+      ],
+      "sum_mib": 46.283172607421875,
+      "stage": "closed-to-3",
+      "windows": 3
+    },
+    {
+      "time": 1792802666.8381,
+      "main_pid": 21011,
+      "main_mib": 14.62591552734375,
+      "children": [
+        [
+          21083,
+          31.391632080078125
+        ]
+      ],
+      "sum_mib": 46.017547607421875,
+      "stage": "closed-to-1",
+      "windows": 1
+    },
+    {
+      "time": 1792802670.082512,
+      "main_pid": 21011,
+      "main_mib": 14.62591552734375,
+      "children": [],
+      "sum_mib": 14.62591552734375,
+      "stage": "idle-cycle-1-3s",
+      "windows": 0,
+      "seconds_since_last_window_close": 3.1894290447235107
+    },
+    {
+      "time": 1792802683.643939,
+      "main_pid": 21011,
+      "main_mib": 14.61029052734375,
+      "children": [],
+      "sum_mib": 14.61029052734375,
+      "stage": "idle-cycle-1-15s",
+      "windows": 0,
+      "seconds_since_last_window_close": 16.750856161117554
+    },
+    {
+      "time": 1792802715.5496829,
+      "main_pid": 21011,
+      "main_mib": 14.547767639160156,
+      "children": [],
+      "sum_mib": 14.547767639160156,
+      "stage": "idle-cycle-1-45s",
+      "windows": 0,
+      "seconds_since_last_window_close": 48.65659999847412
+    },
+    {
+      "time": 1792802721.485861,
+      "main_pid": 21011,
+      "main_mib": 14.73529052734375,
+      "children": [
+        [
+          21713,
+          27.516632080078125
+        ]
+      ],
+      "sum_mib": 42.251922607421875,
+      "stage": "reopened-cycle-2",
+      "windows": 2
+    },
+    {
+      "time": 1792802724.729751,
+      "main_pid": 21011,
+      "main_mib": 14.93841552734375,
+      "children": [],
+      "sum_mib": 14.93841552734375,
+      "stage": "idle-cycle-2-3s",
+      "windows": 0,
+      "seconds_since_last_window_close": 3.195786237716675
+    },
+    {
+      "time": 1792802737.156234,
+      "main_pid": 21011,
+      "main_mib": 14.53216552734375,
+      "children": [],
+      "sum_mib": 14.53216552734375,
+      "stage": "idle-cycle-2-15s",
+      "windows": 0,
+      "seconds_since_last_window_close": 15.62226915359497
+    }
+  ],
+  "sampled_main_worker_sum_max_mib": 47.361297607421875,
+  "maximum_child_count": 1,
+  "worker_pids": [
+    21083,
+    21713
+  ],
+  "final_child_count": 0,
+  "capture_metadata": [
+    {
+      "png_bytes": 73207,
+      "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627",
+      "pid": 21083
+    },
+    {
+      "pid": 21083,
+      "png_bytes": 73207,
+      "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627"
+    },
+    {
+      "pid": 21083,
+      "png_bytes": 73207,
+      "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627"
+    },
+    {
+      "pid": 21083,
+      "png_bytes": 73207,
+      "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627"
+    },
+    {
+      "pid": 21713,
+      "png_bytes": 73207,
+      "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627"
+    },
+    {
+      "png_bytes": 73207,
+      "pid": 21083,
+      "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627"
+    },
+    {
+      "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627",
+      "pid": 21713,
+      "png_bytes": 73207
+    }
+  ],
+  "completed_result_metadata": [
+    {
+      "pid": 21083,
+      "text_utf8_bytes": 120
+    },
+    {
+      "text_utf8_bytes": 120,
+      "pid": 21083
+    },
+    {
+      "text_utf8_bytes": 120,
+      "pid": 21083
+    },
+    {
+      "pid": 21083,
+      "text_utf8_bytes": 111
+    },
+    {
+      "text_utf8_bytes": 117,
+      "pid": 21713
+    },
+    {
+      "pid": 21713,
+      "text_utf8_bytes": 114
+    },
+    {
+      "text_utf8_bytes": 111,
+      "pid": 21083
+    }
+  ],
+  "close_times": [
+    {
+      "worker_pid": 21083,
+      "closed_time": 1792802666.8930829
+    },
+    {
+      "worker_pid": 21713,
+      "closed_time": 1792802721.5339649
+    }
+  ],
+  "xpc_snapshots": {
+    "idle-cycle-1-15s-main-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 21011,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 14.6,
+          "peak_mib": 15.1
+        },
+        {
+          "pid": 21017,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 21011,
+          "footprint_mib": 3.016,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 17.616,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "idle-cycle-1-3s-main-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 21011,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 14.6,
+          "peak_mib": 15.1
+        },
+        {
+          "pid": 21017,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 21011,
+          "footprint_mib": 3.016,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 17.616,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "idle-cycle-2-15s-main-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 21011,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 14.5,
+          "peak_mib": 15.1
+        },
+        {
+          "pid": 21017,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 21011,
+          "footprint_mib": 3.016,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 17.516,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "retained-5-main-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 21011,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 14.9,
+          "peak_mib": 15.1
+        },
+        {
+          "pid": 21017,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 21011,
+          "footprint_mib": 3.047,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 17.947,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "retained-5-worker-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 21083,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 32.5,
+          "peak_mib": 32.5
+        },
+        {
+          "pid": 21085,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 21083,
+          "footprint_mib": 2.531,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 35.031,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "idle-cycle-1-45s-main-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 21011,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 14.5,
+          "peak_mib": 15.1
+        },
+        {
+          "pid": 21017,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 21011,
+          "footprint_mib": 3.016,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 17.516,
+      "optional_ui_service_count": 0,
+      "errors": []
+    }
+  },
+  "observed_service_exit_checks": {
+    "idle-cycle-1-3s-worker-service-exit": {
+      "observed_worker_services": [
+        21085
+      ],
+      "still_alive_after_close": []
+    },
+    "idle-cycle-1-45s-worker-service-exit": {
+      "observed_worker_services": [
+        21085
+      ],
+      "still_alive_after_close": []
+    },
+    "idle-cycle-2-15s-worker-service-exit": {
+      "observed_worker_services": [
+        21085
+      ],
+      "still_alive_after_close": []
+    },
+    "idle-cycle-1-15s-worker-service-exit": {
+      "observed_worker_services": [
+        21085
+      ],
+      "still_alive_after_close": []
+    }
+  },
+  "source_sha256": {
+    "sources/SnapTranslate/AppMain.swift": "f156b7b83e271d025067110673b6034332fc5089afb268b3d239cdbc9bd8ac50",
+    "sources/SnapTranslate/GlobalHotKey.swift": "6f206aa3bf201b2d2b25020c3dc5c59a5a256f2d35fe9bc87ce5033f093be9cd",
+    "sources/SnapTranslate/KeyboardShortcut.swift": "e8f6dadfd60c5bde50f57c4de09298ab28c630e2df6e8239cb7e40610e5fba67",
+    "sources/SnapTranslate/PNGEncoder.swift": "ac0f28317aa7f8c4368a7f59337542348c09b76f87744ebc3422d61d129afb8f",
+    "sources/SnapTranslate/RegionSelector.swift": "ebc3318c18f51113fe920283557fb8be228b87ac5f821c5eeb14649fb02c6273",
+    "sources/SnapTranslate/ResultErrorPresentation.swift": "46303457f69221cf3c89dcdfb2b828989202ab4d273636c8f4217c7989b81d53",
+    "sources/SnapTranslate/ResultPanelController.swift": "674232ccbd7f17549d43118ce31e2a57eccd2632662edff764ea00a439323671",
+    "sources/SnapTranslate/ScreenCapture.swift": "6ac8459a605fa63f220d8da94fcdda5a19ee080055320ff910ac8beebfcdd65a",
+    "sources/SnapTranslate/ScreenCapturePermission.swift": "067d8af9639de29dada6742c47432f85a5574c948193e45f21c5b5ab32e6ac97",
+    "sources/SnapTranslate/SettingsStore.swift": "b1048a254ee8c0acfa3c3a8a24cf8034f1c1ec78dbfe2fdcf7fceb87cb976419",
+    "sources/SnapTranslate/SettingsWindowController.swift": "d39e297efd2e6d1c5b001df217d677bb0bef2c03329dc954b7cd4d908afbaa32",
+    "sources/SnapTranslate/ShortcutRecorder.swift": "8d141db802c6712faee764d19660ce8a37a271253979a208cbb9d4f8d4312dec",
+    "sources/SnapTranslate/TranslationPipeline.swift": "e01b00dab811b1e267cb6ab0e86bfbc61f79126d72c8f57daf2c5000d558cec8",
+    "sources/SnapTranslate/TranslationWorker.swift": "1111da5a0c6362bed684f5cf5a059890f8ab94e717145f6b112fe47d891de344",
+    "sources/SnapTranslate/WindowResourcePolicy.swift": "14d6b7f1a659648f81dc107822f2f5737535d28aeedd708c19d1ee16c29569bc",
+    "sources/SnapTranslate/WorkerClient.swift": "2452449d6ef8929e869b1aea3febfb96f73812a95240cf742e16b32018a506bc",
+    "sources/SnapTranslate/WorkerNetworkAdmission.swift": "62e4ae3618a70063320508b7bd074d05983719128b8adf5560e32f5e9eff6cba",
+    "sources/SnapTranslate/WorkerProcess.swift": "9f1f11468696397ae17412ec3b8b49acafb06f332e9495000cbed75d99e833a0",
+    "sources/TranslationCore/DeepSeekClient.swift": "48ea3a4cf9fcb4826fe4c0e1be721182877289a27d4881ec8dd95b43dd8b7e3e",
+    "sources/TranslationCore/RequestBodyStream.swift": "77740d3d0bb1733294a735224c54c50f0fb99469e6cabd91df33772cf0549d8e",
+    "sources/TranslationCore/SSEParser.swift": "594e75f6d410ef2db7717a8828605ab6b69fb6445c5c8738a63b7f3969b01b14",
+    "sources/TranslationCore/TranslationError.swift": "080f3f591dd3f85e1f1fa4e765282657fbc6fe1c14a8fcb302572deb782e1a2b"
+  },
+  "probe_sha256": "e07111fe3cdf867a9101c4152b6d8cde5860c4aee434d8eec87393f3ea3ea9b6"
+}

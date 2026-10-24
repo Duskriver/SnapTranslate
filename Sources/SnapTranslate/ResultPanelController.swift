@@ -45,7 +45,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
     @available(*, unavailable)
     required init?(coder: NSCoder) { fatalError("Use init()") }
 
-    func showLoading(near anchor: NSRect? = nil) {
+    func showLoading(near anchor: NSRect? = nil, avoiding occupied: [NSRect] = []) {
         guard let panel = window else { return }
         // Reusing a visible panel is still the same presentation. This does not
         // invoke onClose, which the owner uses to cancel the active request.
@@ -62,7 +62,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         statusLabel.setAccessibilityHelp(nil)
         progress.isHidden = false
         progress.startAnimation(nil)
-        position(panel, near: anchor)
+        position(panel, near: anchor, avoiding: occupied)
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(textView)
     }
@@ -238,7 +238,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         ])
     }
 
-    private func position(_ panel: NSWindow, near anchor: NSRect?) {
+    private func position(_ panel: NSWindow, near anchor: NSRect?, avoiding occupied: [NSRect]) {
         let screen = anchor.flatMap { rect in
             NSScreen.screens.max { first, second in
                 intersectionArea(first.frame, rect) < intersectionArea(second.frame, rect)
@@ -265,6 +265,18 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         }
         origin.x = min(max(origin.x, visibleFrame.minX), visibleFrame.maxX - size.width)
         origin.y = min(max(origin.y, visibleFrame.minY), visibleFrame.maxY - size.height)
+        // Repeated captures of the same area should leave earlier title bars
+        // reachable. Search a small cascade, wrapping at the screen edges.
+        let initial = origin
+        for offset in 1...(occupied.count + 1) {
+            guard occupied.contains(where: { abs($0.minX - origin.x) < 20 && abs($0.minY - origin.y) < 20 }) else { break }
+            origin.x = initial.x + CGFloat(offset) * 28
+            origin.y = initial.y - CGFloat(offset) * 28
+            if origin.x > visibleFrame.maxX - size.width { origin.x = visibleFrame.minX + CGFloat(offset - 1) * 28 }
+            if origin.y < visibleFrame.minY { origin.y = visibleFrame.maxY - size.height - CGFloat(offset - 1) * 28 }
+            origin.x = min(max(origin.x, visibleFrame.minX), visibleFrame.maxX - size.width)
+            origin.y = min(max(origin.y, visibleFrame.minY), visibleFrame.maxY - size.height)
+        }
         panel.setFrame(NSRect(origin: origin, size: size), display: false)
     }
 

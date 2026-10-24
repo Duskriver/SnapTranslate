@@ -1,0 +1,341 @@
+{
+  "scope": "Current physical footprint of main plus direct worker; sum does not deduplicate shared pages and excludes XPC, WindowServer and GPU. Concurrent observer samples about every 100 ms. Stage snapshots are acknowledged before changing window count.",
+  "stages": {
+    "startup": {
+      "main_mib": {
+        "median": 13.219642639160156,
+        "min": 13.04779052734375,
+        "max": 13.31341552734375
+      },
+      "worker_mib": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "sum_mib": {
+        "median": 13.219642639160156,
+        "min": 13.04779052734375,
+        "max": 13.31341552734375
+      }
+    },
+    "retained-1": {
+      "main_mib": {
+        "median": 14.43841552734375,
+        "min": 14.18841552734375,
+        "max": 14.469688415527344
+      },
+      "worker_mib": {
+        "median": 25.86040496826172,
+        "min": 25.68852996826172,
+        "max": 26.04790496826172
+      },
+      "sum_mib": {
+        "median": 40.33009338378906,
+        "min": 39.87694549560547,
+        "max": 40.48632049560547
+      }
+    },
+    "retained-3": {
+      "main_mib": {
+        "median": 14.65716552734375,
+        "min": 14.42279052734375,
+        "max": 14.672813415527344
+      },
+      "worker_mib": {
+        "median": 29.62602996826172,
+        "min": 27.81352996826172,
+        "max": 29.93852996826172
+      },
+      "sum_mib": {
+        "median": 44.29884338378906,
+        "min": 42.23632049560547,
+        "max": 44.59569549560547
+      }
+    },
+    "retained-5": {
+      "main_mib": {
+        "median": 14.70404052734375,
+        "min": 14.42279052734375,
+        "max": 14.719688415527344
+      },
+      "worker_mib": {
+        "median": 32.39165496826172,
+        "min": 30.53227996826172,
+        "max": 32.84477996826172
+      },
+      "sum_mib": {
+        "median": 47.11134338378906,
+        "min": 44.95507049560547,
+        "max": 47.54882049560547
+      }
+    },
+    "retained-10": {
+      "main_mib": {
+        "median": 15.079063415527344,
+        "min": 14.81341552734375,
+        "max": 15.11029052734375
+      },
+      "worker_mib": {
+        "median": 38.67292785644531,
+        "min": 38.62605285644531,
+        "max": 39.73542785644531
+      },
+      "sum_mib": {
+        "median": 53.751991271972656,
+        "min": 53.43946838378906,
+        "max": 54.84571838378906
+      }
+    },
+    "closed-to-5": {
+      "main_mib": {
+        "median": 15.079063415527344,
+        "min": 14.81341552734375,
+        "max": 15.11029052734375
+      },
+      "worker_mib": {
+        "median": 36.51667785644531,
+        "min": 35.98542785644531,
+        "max": 37.71980285644531
+      },
+      "sum_mib": {
+        "median": 51.595741271972656,
+        "min": 50.79884338378906,
+        "max": 52.83009338378906
+      }
+    },
+    "closed-to-1": {
+      "main_mib": {
+        "median": 15.079063415527344,
+        "min": 14.73529052734375,
+        "max": 15.11029052734375
+      },
+      "worker_mib": {
+        "median": 34.37605285644531,
+        "min": 33.70417785644531,
+        "max": 35.78230285644531
+      },
+      "sum_mib": {
+        "median": 49.455116271972656,
+        "min": 48.43946838378906,
+        "max": 50.89259338378906
+      }
+    },
+    "idle-cycle-1": {
+      "main_mib": {
+        "median": 15.000938415527344,
+        "min": 14.75091552734375,
+        "max": 15.016563415527344
+      },
+      "worker_mib": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "sum_mib": {
+        "median": 15.000938415527344,
+        "min": 14.75091552734375,
+        "max": 15.016563415527344
+      }
+    },
+    "reopened-cycle-2": {
+      "main_mib": {
+        "median": 15.094688415527344,
+        "min": 14.84466552734375,
+        "max": 15.172813415527344
+      },
+      "worker_mib": {
+        "median": 29.07915496826172,
+        "min": 28.95415496826172,
+        "max": 29.126007080078125
+      },
+      "sum_mib": {
+        "median": 44.12696838378906,
+        "min": 43.92382049560547,
+        "max": 44.22069549560547
+      }
+    },
+    "idle-cycle-2": {
+      "main_mib": {
+        "median": 15.094688415527344,
+        "min": 14.84466552734375,
+        "max": 15.172813415527344
+      },
+      "worker_mib": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "sum_mib": {
+        "median": 15.094688415527344,
+        "min": 14.84466552734375,
+        "max": 15.172813415527344
+      }
+    },
+    "reopened-cycle-3": {
+      "main_mib": {
+        "median": 15.094688415527344,
+        "min": 14.84466552734375,
+        "max": 15.219688415527344
+      },
+      "worker_mib": {
+        "median": 25.610382080078125,
+        "min": 25.563507080078125,
+        "max": 25.62602996826172
+      },
+      "sum_mib": {
+        "median": 40.70507049560547,
+        "min": 40.408172607421875,
+        "max": 40.84571838378906
+      }
+    },
+    "idle-cycle-3": {
+      "main_mib": {
+        "median": 15.094688415527344,
+        "min": 14.84466552734375,
+        "max": 15.219688415527344
+      },
+      "worker_mib": {
+        "median": 0.0,
+        "min": 0.0,
+        "max": 0.0
+      },
+      "sum_mib": {
+        "median": 15.094688415527344,
+        "min": 14.84466552734375,
+        "max": 15.219688415527344
+      }
+    }
+  },
+  "runs": [
+    {
+      "run": 1,
+      "sampled_main_worker_sum_max_mib": 53.68946838378906,
+      "maximum_child_count": 1,
+      "last_child_count": 0
+    },
+    {
+      "run": 2,
+      "sampled_main_worker_sum_max_mib": 56.36134338378906,
+      "maximum_child_count": 1,
+      "last_child_count": 0
+    },
+    {
+      "run": 3,
+      "sampled_main_worker_sum_max_mib": 54.095741271972656,
+      "maximum_child_count": 1,
+      "last_child_count": 0
+    }
+  ],
+  "png_uploads": {
+    "count": 42,
+    "unique_payloads": [
+      {
+        "bytes": 73207,
+        "dimensions": [
+          1740,
+          940
+        ],
+        "sha256": "60487d35ab1031519dcc7c27736ec31f3fe874eac4f51e9157966cbf48802627"
+      }
+    ]
+  },
+  "xpc_snapshots_run_1": {
+    "retained-10-worker-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 19591,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 38.6,
+          "peak_mib": 38.9
+        },
+        {
+          "pid": 19593,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 19591,
+          "footprint_mib": 2.531,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 41.131,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "idle-cycle-1-main-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 19531,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 14.8,
+          "peak_mib": 14.9
+        },
+        {
+          "pid": 19574,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 19531,
+          "footprint_mib": 2.422,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 17.222,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "retained-10-main-xpc": {
+      "scope": "Main process and recursively discovered active XPC services; sequential snapshot, excluding WindowServer/GPU and other shared daemons. Sum is not deduplicated physical RAM.",
+      "processes": [
+        {
+          "pid": 19531,
+          "name": "SnapTranslate",
+          "owner_pid": null,
+          "footprint_mib": 14.8,
+          "peak_mib": 14.9
+        },
+        {
+          "pid": 19574,
+          "name": "com.apple.SetStoreUpdateService",
+          "owner_pid": 19531,
+          "footprint_mib": 2.469,
+          "peak_mib": 4.375
+        }
+      ],
+      "sampled_footprint_sum_mib": 17.269,
+      "optional_ui_service_count": 0,
+      "errors": []
+    },
+    "worker-service-exit": {
+      "observed_worker_services": [
+        19593
+      ],
+      "still_alive_after_close": []
+    }
+  },
+  "source_sha256": {
+    "sources/SnapTranslate/AppMain.swift": "f156b7b83e271d025067110673b6034332fc5089afb268b3d239cdbc9bd8ac50",
+    "sources/SnapTranslate/GlobalHotKey.swift": "6f206aa3bf201b2d2b25020c3dc5c59a5a256f2d35fe9bc87ce5033f093be9cd",
+    "sources/SnapTranslate/KeyboardShortcut.swift": "e8f6dadfd60c5bde50f57c4de09298ab28c630e2df6e8239cb7e40610e5fba67",
+    "sources/SnapTranslate/PNGEncoder.swift": "ac0f28317aa7f8c4368a7f59337542348c09b76f87744ebc3422d61d129afb8f",
+    "sources/SnapTranslate/RegionSelector.swift": "ebc3318c18f51113fe920283557fb8be228b87ac5f821c5eeb14649fb02c6273",
+    "sources/SnapTranslate/ResultErrorPresentation.swift": "46303457f69221cf3c89dcdfb2b828989202ab4d273636c8f4217c7989b81d53",
+    "sources/SnapTranslate/ResultPanelController.swift": "674232ccbd7f17549d43118ce31e2a57eccd2632662edff764ea00a439323671",
+    "sources/SnapTranslate/ScreenCapture.swift": "6ac8459a605fa63f220d8da94fcdda5a19ee080055320ff910ac8beebfcdd65a",
+    "sources/SnapTranslate/ScreenCapturePermission.swift": "067d8af9639de29dada6742c47432f85a5574c948193e45f21c5b5ab32e6ac97",
+    "sources/SnapTranslate/SettingsStore.swift": "b1048a254ee8c0acfa3c3a8a24cf8034f1c1ec78dbfe2fdcf7fceb87cb976419",
+    "sources/SnapTranslate/SettingsWindowController.swift": "d39e297efd2e6d1c5b001df217d677bb0bef2c03329dc954b7cd4d908afbaa32",
+    "sources/SnapTranslate/ShortcutRecorder.swift": "8d141db802c6712faee764d19660ce8a37a271253979a208cbb9d4f8d4312dec",
+    "sources/SnapTranslate/TranslationPipeline.swift": "e01b00dab811b1e267cb6ab0e86bfbc61f79126d72c8f57daf2c5000d558cec8",
+    "sources/SnapTranslate/TranslationWorker.swift": "da65b93d97f189c94943f744be619f1fed9cd0049f25f264337a7f2e50f9082c",
+    "sources/SnapTranslate/WindowResourcePolicy.swift": "14d6b7f1a659648f81dc107822f2f5737535d28aeedd708c19d1ee16c29569bc",
+    "sources/SnapTranslate/WorkerClient.swift": "2452449d6ef8929e869b1aea3febfb96f73812a95240cf742e16b32018a506bc",
+    "sources/SnapTranslate/WorkerNetworkAdmission.swift": "62e4ae3618a70063320508b7bd074d05983719128b8adf5560e32f5e9eff6cba",
+    "sources/SnapTranslate/WorkerProcess.swift": "9f1f11468696397ae17412ec3b8b49acafb06f332e9495000cbed75d99e833a0",
+    "sources/TranslationCore/DeepSeekClient.swift": "51f972fda19d4bfde918990ec709597eaa699a9f3cf51d0f3b5dc2d14897324a",
+    "sources/TranslationCore/RequestBodyStream.swift": "77740d3d0bb1733294a735224c54c50f0fb99469e6cabd91df33772cf0549d8e",
+    "sources/TranslationCore/SSEParser.swift": "594e75f6d410ef2db7717a8828605ab6b69fb6445c5c8738a63b7f3969b01b14",
+    "sources/TranslationCore/TranslationError.swift": "080f3f591dd3f85e1f1fa4e765282657fbc6fe1c14a8fcb302572deb782e1a2b"
+  },
+  "benchmark_probe_sha256": "5837fd435a7d23a6ead315a306c482ff473d88030d88da0ab774f5fdf0cf0f61"
+}

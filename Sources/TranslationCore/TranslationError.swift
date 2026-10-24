@@ -1,6 +1,6 @@
 import Foundation
 
-public enum TranslationError: Error, LocalizedError, Sendable, Equatable {
+public enum TranslationError: Error, LocalizedError, Sendable, Equatable, Codable {
     case missingAPIKey
     case invalidAPIKey
     case invalidImage

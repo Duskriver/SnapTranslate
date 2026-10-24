@@ -23,7 +23,10 @@ enum CaptureError: LocalizedError {
 
 enum ScreenCapture {
     @MainActor
-    static func capture(_ region: SelectedRegion) async throws -> CapturedImage {
+    static func capture(
+        _ region: SelectedRegion,
+        excludingProcessIDs: Set<Int32> = [ProcessInfo.processInfo.processIdentifier]
+    ) async throws -> CapturedImage {
         try Task.checkCancellation()
         guard let displayNumber = region.screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber else {
             throw CaptureError.missingDisplay
@@ -38,7 +41,7 @@ enum ScreenCapture {
             throw CaptureError.missingDisplay
         }
         // Exclude our windows, even if the compositor hasn't removed the selection overlay yet.
-        let ownApps = content.applications.filter { $0.processID == ProcessInfo.processInfo.processIdentifier }
+        let ownApps = content.applications.filter { excludingProcessIDs.contains($0.processID) }
         let filter = SCContentFilter(display: display, excludingApplications: ownApps, exceptingWindows: [])
         let configuration = SCStreamConfiguration()
         configuration.sourceRect = CGRect(x: rect.minX - screenFrame.minX, y: screenFrame.maxY - rect.maxY, width: rect.width, height: rect.height)

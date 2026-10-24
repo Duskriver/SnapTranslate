@@ -4,6 +4,7 @@ import AppKit
 struct SnapTranslateMain {
     @MainActor
     static func main() {
+        if CommandLine.arguments.contains(TranslationWorker.argument) { TranslationWorker.run() }
         let application = NSApplication.shared
         application.setActivationPolicy(.accessory)
         let delegate = AppDelegate()
@@ -24,7 +25,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var captureMenuItems: [NSMenuItem] = []
     private(set) var settingsController: SettingsWindowController?
     private(set) var resultController: ResultPanelController?
-    private(set) var translationTask: Task<Void, Never>?
+    private(set) var translationTasks: [UUID: Task<Void, Never>] = [:]
+    var translationTask: Task<Void, Never>? { activeRequestID.flatMap { translationTasks[$0] } }
     private var activeRequestID: UUID?
     private var isTerminating = false
 
@@ -151,6 +153,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             item.keyEquivalentModifierMask = shortcut.modifierFlags
         }
         statusItem?.button?.toolTip = "SnapTranslate · \(shortcut.displayName) 截屏翻译"
+        if pipeline.presentsResult { WorkerClient.shared.updateShortcut(shortcut) }
     }
 
     @objc func beginCapture() {
@@ -164,7 +167,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         guard !key.isEmpty else { showSettings(); return }
-        cancelTranslation()
+        if !pipeline.presentsResult { cancelTranslation() }
         resultController?.dismiss()
         guard ensureCapturePermission() else { return }
         // A secure key field must never appear in the source screenshot.
@@ -180,33 +183,42 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard !isTerminating else { return }
         let identifier = UUID()
         activeRequestID = identifier
-        let panel = resultPanel()
-        panel.showLoading(near: region.rect)
+        if !pipeline.presentsResult { resultPanel().showLoading(near: region.rect) }
         let pipeline = pipeline
-        translationTask = Task { [weak self] in
+        translationTasks[identifier] = Task { [weak self] in
             // A cancelled system operation may take time to return. It must not
             // keep the app delegate or a dismissed result window alive meanwhile.
             defer {
-                if let self, self.activeRequestID == identifier {
-                    self.activeRequestID = nil
-                    self.translationTask = nil
+                if let self {
+                    self.translationTasks.removeValue(forKey: identifier)
+                    if self.activeRequestID == identifier { self.activeRequestID = nil }
                 }
             }
             do {
                 try Task.checkCancellation()
-                let image = try await pipeline.capture(region)
-                try Task.checkCancellation()
-                try await pipeline.translate(image, apiKey, language) { [weak self] delta in
+                let delivery = TranslationDelivery(onDelta: { [weak self] delta in
                     await MainActor.run {
-                        guard let self, self.activeRequestID == identifier else { return }
+                        guard let self, self.translationTasks[identifier] != nil else { return }
                         self.resultController?.append(delta: delta)
                     }
-                }
+                }, onAction: { [weak self] action in
+                    await MainActor.run {
+                        guard let self, self.translationTasks[identifier] != nil else { return }
+                        switch action {
+                        case .settings: self.showSettings()
+                        case .screenRecordingSettings: self.showScreenRecordingSettings()
+                        case .capture: self.beginCapture()
+                        case .quit: NSApplication.shared.terminate(nil)
+                        }
+                    }
+                })
+                try await pipeline.run(region, apiKey, language, delivery)
                 try Task.checkCancellation()
-                guard let self, self.activeRequestID == identifier else { return }
+                guard !pipeline.presentsResult, let self, self.translationTasks[identifier] != nil else { return }
                 self.resultController?.finish()
             } catch {
-                guard !Task.isCancelled, let self, self.activeRequestID == identifier else { return }
+                guard !Task.isCancelled, let self, self.translationTasks[identifier] != nil else { return }
+                if self.resultController == nil { self.resultPanel().showLoading(near: region.rect) }
                 self.resultController?.showError(error)
             }
         }
@@ -216,7 +228,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let resultController { return resultController }
         let controller = makeResultPanel()
         controller.onClose = { [weak self] in
-            self?.cancelTranslation()
+            if self?.pipeline.presentsResult == false { self?.cancelTranslation() }
             self?.resultController = nil
         }
         controller.onOpenSettings = { [weak self] in self?.showSettings() }
@@ -227,8 +239,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func cancelTranslation() {
         activeRequestID = nil
-        translationTask?.cancel()
-        translationTask = nil
+        let tasks = translationTasks.values
+        translationTasks.removeAll()
+        for task in tasks { task.cancel() }
     }
 
     private func ensureCapturePermission() -> Bool {

@@ -1,7 +1,7 @@
 import AppKit
 import Carbon.HIToolbox
 
-struct KeyboardShortcut: Codable, Equatable {
+struct KeyboardShortcut: Codable, Equatable, Sendable {
     let keyCode: UInt32
     let modifiers: UInt32
 

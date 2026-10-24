@@ -93,6 +93,86 @@ extension AppKitTests {
             #expect(try fixture.resultText() == "current translation")
         }
 
+        @Test func workerKeepsEarlierResultAndRejectsActionsAfterItCloses() async throws {
+            let slot = WorkerDeliverySlot()
+            let fixture = try LifecycleFixture(pipelineOverride: TranslationPipeline(presentsResult: true) { _, _, _, delivery in
+                slot.delivery = delivery
+                try await withCheckedThrowingContinuation { slot.continuation = $0 }
+            })
+            defer { fixture.cleanUp(); slot.continuation?.resume(); slot.continuation = nil }
+            try fixture.selectRegion()
+            let task = try #require(fixture.app?.translationTask)
+            try await eventually { slot.delivery != nil }
+            #expect(fixture.app?.resultController == nil)
+            let delivery = try #require(slot.delivery)
+            await delivery.onAction(.settings)
+            #expect(fixture.app?.settingsController != nil)
+            fixture.app?.settingsController?.close()
+            try fixture.beginSelection()
+            #expect(!task.isCancelled)
+            slot.continuation?.resume()
+            slot.continuation = nil
+            await task.value
+            await delivery.onAction(.settings)
+            #expect(fixture.app?.settingsController == nil)
+            #expect(fixture.selector.isSelecting)
+        }
+
+        @Test func workerLaunchFailurePresentsAnAppOwnedRecoveryWindow() async throws {
+            let fixture = try LifecycleFixture(pipelineOverride: TranslationPipeline(presentsResult: true) { _, _, _, _ in
+                throw TranslationError.networkUnavailable
+            })
+            defer { fixture.cleanUp() }
+            try fixture.selectRegion()
+            let task = try #require(fixture.app?.translationTask)
+            await task.value
+            #expect(fixture.app?.resultController != nil)
+            #expect(try fixture.resultText() == TranslationError.networkUnavailable.localizedDescription)
+            #expect(try !fixture.resultIsLoading())
+            fixture.app?.resultController?.dismiss()
+            try await eventually { fixture.app?.resultController == nil }
+        }
+
+        @Test func multipleWorkerResultsRemainActiveUntilEachClosesAndQuitCancelsAll() async throws {
+            var slots: [WorkerDeliverySlot] = []
+            let fixture = try LifecycleFixture(pipelineOverride: TranslationPipeline(presentsResult: true) { _, _, _, delivery in
+                let slot = WorkerDeliverySlot()
+                slot.delivery = delivery
+                slots.append(slot)
+                try await withCheckedThrowingContinuation { slot.continuation = $0 }
+            })
+            defer {
+                fixture.cleanUp()
+                for slot in slots { slot.continuation?.resume(); slot.continuation = nil }
+            }
+            try fixture.selectRegion()
+            let first = try #require(fixture.app?.translationTask)
+            try await eventually { slots.count == 1 }
+            try fixture.selectRegion()
+            let second = try #require(fixture.app?.translationTask)
+            try await eventually { slots.count == 2 }
+            #expect(!first.isCancelled && !second.isCancelled)
+            #expect(fixture.app?.translationTasks.count == 2)
+            await slots[0].delivery?.onAction(.settings)
+            #expect(fixture.app?.settingsController != nil)
+            fixture.app?.settingsController?.close()
+            slots[0].continuation?.resume(); slots[0].continuation = nil
+            await first.value
+            #expect(fixture.app?.translationTasks.count == 1)
+            await slots[0].delivery?.onAction(.settings)
+            #expect(fixture.app?.settingsController == nil)
+            try fixture.selectRegion()
+            let third = try #require(fixture.app?.translationTask)
+            try await eventually { slots.count == 3 }
+            fixture.terminate()
+            #expect(second.isCancelled && third.isCancelled)
+            #expect(fixture.app?.translationTasks.isEmpty == true)
+            await slots[1].delivery?.onAction(.settings)
+            #expect(fixture.app?.settingsController == nil)
+            for slot in slots { slot.continuation?.resume(); slot.continuation = nil }
+            await second.value; await third.value
+        }
+
         @Test(arguments: ShutdownPhase.allCases)
         func terminationCancelsWorkAndRejectsLateDelivery(phase: ShutdownPhase) async throws {
             let fixture = try LifecycleFixture()
@@ -180,7 +260,7 @@ private final class LifecycleFixture {
     var app: AppDelegate?
     var selectionWindows: [WeakReference<NSWindow>] = []
 
-    init() throws {
+    init(pipelineOverride: TranslationPipeline? = nil) throws {
         _ = NSApplication.shared
         defaults = try #require(UserDefaults(suiteName: suite))
         store = SettingsStore(defaults: defaults, keyStorage: keys)
@@ -190,7 +270,7 @@ private final class LifecycleFixture {
         let probe = probe
         app = AppDelegate(
             settings: store, hotKey: hotKey, selector: selector,
-            pipeline: TranslationPipeline(
+            pipeline: pipelineOverride ?? TranslationPipeline(
                 capture: { _ in try await probe.capture() },
                 translate: { _, _, _, onDelta in try await probe.translate(onDelta: onDelta) }
             ),
@@ -342,4 +422,9 @@ private func eventually(_ predicate: () -> Bool) async throws {
     let deadline = ContinuousClock.now.advanced(by: .seconds(3))
     while !predicate(), ContinuousClock.now < deadline { await Task.yield() }
     try #require(predicate(), "Lifecycle transition did not complete before the deadline")
+}
+
+@MainActor private final class WorkerDeliverySlot {
+    var delivery: TranslationDelivery?
+    var continuation: CheckedContinuation<Void, any Error>?
 }

@@ -8,9 +8,21 @@ SnapTranslate 是独立开源项目，**不是 DeepSeek 官方客户端**，与 
 
 *A minimal native macOS screenshot translator built with Swift and AppKit. Select a region with a keyboard shortcut, send it directly to DeepSeek, and read the streamed translation in a floating panel. No third-party dependencies.*
 
+## 下载
+
+在 [GitHub Releases](https://github.com/Duskriver/SnapTranslate/releases) 下载应用包。目前提供 **macOS 14 或更高版本、Apple Silicon（arm64）** 的预编译版本，不适用于 Intel Mac。解压后将 `SnapTranslate.app` 拖入「应用程序」文件夹，再打开应用；使用需要自己的 DeepSeek API Key。
+
+当前下载包使用固定的本机自签名，**尚无 Apple Developer ID 签名或 Apple 公证**。macOS 可能拦截首次启动；确认来源和完整性后，可按 [Apple 的说明](https://support.apple.com/zh-cn/102445) 在「系统设置 → 隐私与安全性」选择「仍要打开」。不需要关闭系统的安全检查。
+
+每个版本附有 `SHA256SUMS`。将它与应用 ZIP 下载到同一目录后，可校验下载完整性：
+
+```sh
+shasum -a 256 -c SHA256SUMS
+```
+
 ## 从源码运行
 
-需要 **macOS 14 或更高版本**、**Xcode 16 或更新版本提供的 Swift 6 工具链**。当前项目以源码构建为主；构建脚本生成本机架构的应用，不生成通用二进制。
+需要 **macOS 14 或更高版本**、**Xcode 16 或更新版本提供的 Swift 6 工具链**。构建脚本生成本机架构的应用，不生成通用二进制。
 
 ```sh
 git clone https://github.com/Duskriver/SnapTranslate.git
@@ -25,7 +37,7 @@ open build/SnapTranslate.app
 
 ## 使用
 
-1. 打开 `build/SnapTranslate.app`。它显示在菜单栏中，没有 Dock 图标。
+1. 打开 `SnapTranslate.app`（源码构建时位于 `build/`）。它显示在菜单栏中，没有 Dock 图标。
 2. 在首次打开的设置窗口中填入自己的 DeepSeek API Key 并保存。也可以从菜单栏进入「设置」。密钥只保存在本机系统钥匙串中；再次打开设置只显示已保存状态，留空保留原密钥，输入新值替换，点击「删除密钥」后保存才会删除。
 3. 按 **Option + Shift + T** 或自己设置的快捷键。首次使用时，按系统提示允许「屏幕录制」权限；如果系统要求，请退出并重开应用。
 4. 在任意一块显示器上拖动框选。松开鼠标后开始翻译。一次框选限制在单个显示器内。

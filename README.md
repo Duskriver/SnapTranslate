@@ -10,11 +10,11 @@ SnapTranslate 是独立开源项目，**不是 DeepSeek 官方客户端**，与 
 
 ## 下载
 
-在 [GitHub Releases](https://github.com/Duskriver/SnapTranslate/releases) 下载应用包。目前提供 **macOS 14 或更高版本、Apple Silicon（arm64）** 的预编译版本，不适用于 Intel Mac。解压后将 `SnapTranslate.app` 拖入「应用程序」文件夹，再打开应用；使用需要自己的 DeepSeek API Key。
+在 [GitHub Releases](https://github.com/Duskriver/SnapTranslate/releases) 下载 DMG 安装包。目前提供 **macOS 14 或更高版本、Apple Silicon（arm64）** 的预编译版本，不适用于 Intel Mac。双击 DMG，将窗口左侧的 `SnapTranslate.app` 拖入右侧的 `Applications` 文件夹；复制完成后弹出磁盘映像，从「应用程序」打开应用。使用需要自己的 DeepSeek API Key。
 
 当前下载包使用固定的本机自签名，**尚无 Apple Developer ID 签名或 Apple 公证**。macOS 可能拦截首次启动；确认来源和完整性后，可按 [Apple 的说明](https://support.apple.com/zh-cn/102445) 在「系统设置 → 隐私与安全性」选择「仍要打开」。不需要关闭系统的安全检查。
 
-每个版本附有 `SHA256SUMS`。将它与应用 ZIP 下载到同一目录后，可校验下载完整性：
+每个版本附有 `SHA256SUMS`。将它与 DMG 下载到同一目录后，可校验下载完整性：
 
 ```sh
 shasum -a 256 -c SHA256SUMS

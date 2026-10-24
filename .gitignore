@@ -7,8 +7,5 @@ build/
 .env.*
 work/
 
-# Local architecture generation receipts contain machine-specific paths.
-/.archify/**/*.browser-check.json
-/.archify/**/*.delivery.json
-/.archify/**/*.finalize.json
-/.archify/**/*.finalize-summary.json
+# Local architecture generation artifacts.
+.archify/

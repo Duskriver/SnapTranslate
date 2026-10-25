@@ -61,6 +61,32 @@ extension AppKitTests {
             #expect(text.selectedRange() == NSRange(location: 2, length: 4))
         }
 
+        @Test func renderedMarkdownWrapsWithinViewportOnResize() throws {
+            let (controller, scroll, text) = try makeController()
+            defer { controller.dismiss() }
+            let window = try #require(controller.window)
+            let content = try #require(window.contentView)
+            let layout = try #require(text.textLayoutManager)
+            let longLine = String(repeating: "long_identifier_", count: 40)
+            controller.append(delta: "# 标题\n\n- **加粗** " + longLine + "\n  - 嵌套列表内容\n\n```swift\n" + longLine + "\n```")
+            controller.finish()
+            for width: CGFloat in [340, 584, 440] {
+                window.setContentSize(NSSize(width: width, height: 354))
+                content.layoutSubtreeIfNeeded()
+                layout.ensureLayout(for: layout.documentRange)
+                #expect(abs(text.frame.width - scroll.contentSize.width) < 1)
+                #expect(abs(scroll.contentView.bounds.minX) < 1)
+                layout.enumerateTextLayoutFragments(from: layout.documentRange.location, options: [.ensuresLayout]) { fragment in
+                    for line in fragment.textLineFragments {
+                        let bounds = line.typographicBounds.offsetBy(dx: fragment.layoutFragmentFrame.minX + text.textContainerOrigin.x, dy: 0)
+                        #expect(bounds.minX >= 0)
+                        #expect(bounds.maxX <= scroll.contentSize.width + 1)
+                    }
+                    return true
+                }
+            }
+        }
+
         private func makeController() throws -> (ResultPanelController, NSScrollView, NSTextView) {
             _ = NSApplication.shared
             let controller = ResultPanelController()

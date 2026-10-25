@@ -2,11 +2,13 @@
 
 一个只做截屏翻译的原生 macOS 菜单栏应用。默认按 **⌥⇧T**（可自定义），框选区域，将截图交给 DeepSeek，译文显示在小浮窗中。默认目标语言为简体中文。
 
-Swift + AppKit，零第三方依赖；优先控制待机资源占用，不包含历史记录、本地 OCR、自动更新或模型选择。
+Swift + AppKit，使用 Swift 官方 swift-markdown 解析 Markdown；优先控制待机资源占用，不包含历史记录、本地 OCR、自动更新或模型选择。
+
+第三方组件的许可与声明见 [Resources/ThirdPartyLicenses](Resources/ThirdPartyLicenses)，发行应用包内也包含副本。
 
 SnapTranslate 是独立开源项目，**不是 DeepSeek 官方客户端**，与 DeepSeek 无隶属关系。使用需要自己的 DeepSeek API Key；API 调用由 DeepSeek 计费。
 
-*A minimal native macOS screenshot translator built with Swift and AppKit. Select a region with a keyboard shortcut, send it directly to DeepSeek, and read the streamed translation in a floating panel. No third-party dependencies.*
+*A minimal native macOS screenshot translator built with Swift and AppKit. Select a region with a keyboard shortcut, send it directly to DeepSeek, and read the streamed translation in a floating panel. Markdown is parsed with the official swift-markdown package and rendered as native rich text.*
 
 ## 下载
 
@@ -41,7 +43,7 @@ open build/SnapTranslate.app
 2. 在首次打开的设置窗口中填入自己的 DeepSeek API Key 并保存。也可以从菜单栏进入「设置」。密钥只保存在本机系统钥匙串中；再次打开设置只显示已保存状态，留空保留原密钥，输入新值替换，点击「删除密钥」后保存才会删除。
 3. 按 **Option + Shift + T** 或自己设置的快捷键。首次使用时，按系统提示允许「屏幕录制」权限；如果系统要求，请退出并重开应用。
 4. 在任意一块显示器上拖动框选。松开鼠标后开始翻译。一次框选限制在单个显示器内。
-5. 译文可以选择或用「复制译文」复制。可以继续框选，保留多个独立结果窗口；**Esc** 关闭当前结果，翻译中关闭只取消该窗口的请求。
+5. 翻译期间逐步显示文本，完成后以原生富文本排版显示标题、加粗、列表与代码等 Markdown 内容。译文可以选择或用「复制译文」复制当前显示的文字。可以继续框选，保留多个独立结果窗口；**Esc** 关闭当前结果，翻译中关闭只取消该窗口的请求。
 
 框选时 **Esc**、右键或再次按快捷键可以取消，已有结果不受影响。新的截图翻译会创建新结果窗口；框选后先读取截图，同时最多执行两个网络请求，其余等待，关闭等待中的窗口会取消该任务。也可随时从菜单栏选择「截屏翻译」。
 
@@ -53,7 +55,7 @@ DeepSeek API 按调用计费，需要自己的可用 API Key 和账户余额。�
 
 ## 资源设计
 
-- Swift + AppKit，零第三方依赖。原生文本控件，不加载浏览器或本地 OCR / AI 模型。
+- Swift + AppKit，以 swift-markdown 的 AST 和 MarkupVisitor 生成 NSAttributedString。原生文本控件，不加载浏览器或本地 OCR / AI 模型。
 - 待机只有系统热键与菜单事件，不轮询键盘、剪贴板或屏幕。
 - 设置窗口在独立临时进程中按需创建，关闭后进程退出，回收原生控件和界面缓存。已有 API Key 时默认聚焦语言选项，避免仅查看设置就唤起系统密码自动填充。打开期间两个进程的合计占用会增加，优化的是关窗后的待机内存。
 - 启动和查看设置只检查密钥是否存在，不读取密钥内容；修改语言、快捷键不会重写未改动的密钥。开始截图翻译时才读取已有密钥。
@@ -64,7 +66,7 @@ DeepSeek API 按调用计费，需要自己的可用 API Key 和账户余额。�
 - 位图所有权转交给编码任务，完成后结果只持有 PNG 存储；直接共享已完成的 PNG 缓冲，避免转换为 Swift Data 时复制整份结果。分辨率、色彩、透明度和 ImageIO 无损编码策略保持不变。
 - 请求体按网络读取进度生成，每次最多编码 48 KiB 图片为 64 KiB Base64，不保留完整 JSON body，也不创建临时文件或编码线程；保留精确 Content-Length，并为系统重发提供独立的新流。取消通过 URLSession 停止上传。
 - 每次请求使用短期 `URLSession`，关闭磁盘 HTTP 缓存与 Cookie 存储；不保存截图或翻译历史，不记录密钥、图片和译文。
-- 流式文本约每 90 ms 合并新增片段，界面直接追加并复用文本样式，不反复比较或截取累计全文；停止后不保留刷新定时器。
+- 流式文本约每 90 ms 合并新增片段，界面直接追加并复用文本样式；成功完成时仅解析一次累计 Markdown 并更新富文本，失败时保留已收到的部分译文。停止后不保留刷新定时器。
 
 这里的「不保存」指应用不主动把这些内容写成文件。系统可能有正常的交换内存、诊断或网络设施开销；发送的选区图片由 DeepSeek 服务处理。开始框选前等待设置进程完全退出；截图读取像素期间的新设置请求会延后到捕获完成，避免新出现的密钥输入框进入截图，等待模型响应期间仍可打开设置。截图也排除本应用窗口。
 

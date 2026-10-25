@@ -30,6 +30,7 @@ cp Resources/Info.plist "$APP_DIR/Contents/Info.plist"
 if [ -f Resources/AppIcon.icns ]; then
     cp Resources/AppIcon.icns "$APP_DIR/Contents/Resources/AppIcon.icns"
 fi
+cp -R Resources/ThirdPartyLicenses "$APP_DIR/Contents/Resources/ThirdPartyLicenses"
 strip -S "$APP_DIR/Contents/MacOS/SnapTranslate"
 codesign --force --sign "$SIGN_IDENTITY" --identifier com.local.SnapTranslate "$APP_DIR"
 codesign --verify --strict "$APP_DIR"

@@ -67,6 +67,70 @@ extension AppKitTests {
             #expect(scroll.contentView.bounds.origin == origin)
         }
 
+        @Test func markdownStreamsVerbatimAndRendersOnlyAtSuccessfulFinish() throws {
+            let (controller, text, controls) = try makeController()
+            defer { controller.dismiss() }
+            let fragments = ["# 标", "题\n\n**加", "粗** 与 `co", "de`\n\n- 列表"]
+            var source = ""
+            for fragment in fragments {
+                source += fragment
+                controller.append(delta: fragment)
+                #expect(text.string == source)
+                let streamedFont = try #require(text.textStorage?.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+                #expect(streamedFont.pointSize == 15)
+                #expect(!streamedFont.fontDescriptor.symbolicTraits.contains(.bold))
+            }
+            controller.finish()
+            #expect(text.isRichText)
+            #expect(text.string == "标题\n加粗 与 code\n•\t列表")
+            let storage = try #require(text.textStorage)
+            let headingFont = try #require(storage.attribute(.font, at: 0, effectiveRange: nil) as? NSFont)
+            #expect(headingFont.pointSize > 15)
+            #expect(headingFont.fontDescriptor.symbolicTraits.contains(.bold))
+            #expect(controls.compactMap { $0 as? NSTextField }.contains { $0.stringValue == "翻译完成" })
+
+            // A second completion must not parse/rewrite the text again.
+            let marker = NSAttributedString.Key("MarkdownCompletionTestMarker")
+            storage.addAttribute(marker, value: "kept", range: NSRange(location: 0, length: 1))
+            controller.append(delta: "")
+            controller.finish()
+            #expect(storage.attribute(marker, at: 0, effectiveRange: nil) as? String == "kept")
+
+            controller.append(delta: "\n- 后续")
+            #expect(text.string == source + "\n- 后续")
+            controller.finish()
+            #expect(text.string.hasSuffix("•\t列表\n•\t后续"))
+        }
+
+        @Test func markdownSourceResetsAcrossErrorsLoadingAndDismissal() throws {
+            let (controller, text, _) = try makeController()
+            defer { controller.dismiss() }
+            controller.append(delta: "**部分译文**")
+            controller.showError(TranslationError.incompleteStream)
+            controller.finish()
+            #expect(text.string == "**部分译文**")
+            controller.append(delta: " 与 `code`")
+            controller.finish()
+            #expect(text.string == "部分译文 与 code")
+
+            controller.showLoading()
+            controller.append(delta: " \r\n")
+            controller.finish()
+            #expect(text.string == TranslationError.emptyTranslation.localizedDescription)
+            controller.append(delta: "# 恢复")
+            controller.finish()
+            #expect(text.string == "恢复")
+
+            controller.dismiss()
+            controller.append(delta: "**late**")
+            controller.finish()
+            #expect(text.string.isEmpty)
+            controller.showLoading()
+            controller.append(delta: "*新译文*")
+            controller.finish()
+            #expect(text.string == "新译文")
+        }
+
         private func makeController() throws -> (ResultPanelController, NSTextView, [NSView]) {
             _ = NSApplication.shared
             let controller = ResultPanelController()

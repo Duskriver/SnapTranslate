@@ -1,7 +1,7 @@
 import AppKit
 import TranslationCore
 
-/// A plain-text result window. No browser, history, or image is retained here.
+/// A native rich-text result window. No browser, history, or image is retained here.
 @MainActor
 final class ResultPanelController: NSWindowController, NSWindowDelegate {
     var onClose: (() -> Void)?
@@ -18,6 +18,8 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
     private var presentationIsActive = false
     private var isDisplayingError = false
     private var hasTranslatedText = false
+    private var markdownSource = ""
+    private var isMarkdownRendered = false
 
     init() {
         let panel = TranslationPanel(
@@ -52,6 +54,8 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         presentationIsActive = true
         isDisplayingError = false
         hasTranslatedText = false
+        markdownSource = ""
+        isMarkdownRendered = false
         textView.string = ""
         copyButton.isEnabled = false
         copyButton.title = "复制译文"
@@ -73,7 +77,14 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         if isDisplayingError, !hasTranslatedText {
             // Replace an error-only message, but preserve any partial translation.
             storage.setAttributedString(NSAttributedString(string: ""))
+            markdownSource = ""
+        } else if isMarkdownRendered {
+            // A resumed stream returns to plain incremental display until its
+            // next finish; normal streaming never rewrites accumulated text.
+            storage.setAttributedString(NSAttributedString(string: markdownSource, attributes: textAttributes))
         }
+        isMarkdownRendered = false
+        markdownSource.append(delta)
         storage.append(NSAttributedString(string: delta, attributes: textAttributes))
         isDisplayingError = false
         hasTranslatedText = hasTranslatedText || delta.unicodeScalars.contains {
@@ -121,6 +132,19 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
             showError(TranslationError.emptyTranslation)
             return
         }
+        if !isMarkdownRendered {
+            let shouldFollow = scrollView.contentView.bounds.maxY >= textView.bounds.height - 40
+            let origin = scrollView.contentView.bounds.origin
+            let rendered = MarkdownRenderer().render(markdownSource)
+            textView.textStorage?.setAttributedString(rendered)
+            isMarkdownRendered = true
+            if shouldFollow {
+                textView.scrollRangeToVisible(NSRange(location: rendered.length, length: 0))
+            } else {
+                scrollView.contentView.scroll(to: origin)
+                scrollView.reflectScrolledClipView(scrollView.contentView)
+            }
+        }
         statusLabel.stringValue = "翻译完成"
         statusLabel.textColor = .secondaryLabelColor
     }
@@ -134,16 +158,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         endPresentation()
     }
 
-    private let textAttributes: [NSAttributedString.Key: Any] = {
-        let paragraph = NSMutableParagraphStyle()
-        paragraph.lineSpacing = 4
-        paragraph.lineBreakMode = .byWordWrapping
-        return [
-            .font: NSFont.systemFont(ofSize: 15),
-            .foregroundColor: NSColor.textColor,
-            .paragraphStyle: paragraph,
-        ]
-    }()
+    private let textAttributes = MarkdownRenderer.textAttributes
 
     private func configureContent(in panel: NSPanel) {
         let content = NSView()
@@ -166,7 +181,7 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
 
         textView.isEditable = false
         textView.isSelectable = true
-        textView.isRichText = false
+        textView.isRichText = true
         textView.importsGraphics = false
         textView.allowsUndo = false
         textView.drawsBackground = false
@@ -303,6 +318,8 @@ final class ResultPanelController: NSWindowController, NSWindowDelegate {
         setRecoveryAction(nil)
         isDisplayingError = false
         hasTranslatedText = false
+        markdownSource = ""
+        isMarkdownRendered = false
         // All teardown precedes the callback. The owner may release its only
         // controller reference here, including from windowWillClose.
         let callback = onClose
